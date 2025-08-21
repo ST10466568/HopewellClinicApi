@@ -71,6 +71,38 @@ public static class DataSeeder
                 Description = "General medical consultation and examination",
                 DurationMinutes = 30,
                 IsActive = true
+            },
+            new Service
+            {
+                Id = Guid.Parse("550e8400-e29b-41d4-a716-446655440001"),
+                Name = "Pediatrics Consultation",
+                Description = "Health services for infants and children",
+                DurationMinutes = 30,
+                IsActive = true
+            },
+            new Service
+            {
+                Id = Guid.Parse("550e8400-e29b-41d4-a716-446655440002"),
+                Name = "Dental Checkup",
+                Description = "Routine dental examination and cleaning",
+                DurationMinutes = 45,
+                IsActive = true
+            },
+            new Service
+            {
+                Id = Guid.Parse("550e8400-e29b-41d4-a716-446655440003"),
+                Name = "Physiotherapy Session",
+                Description = "Physical therapy for rehabilitation",
+                DurationMinutes = 60,
+                IsActive = true
+            },
+            new Service
+            {
+                Id = Guid.Parse("550e8400-e29b-41d4-a716-446655440004"),
+                Name = "Vaccination",
+                Description = "Routine immunizations and boosters",
+                DurationMinutes = 20,
+                IsActive = true
             }
         );
 
@@ -81,7 +113,37 @@ public static class DataSeeder
                 Id = Guid.Parse("550e8400-e29b-41d4-a716-446655441000"),
                 UserId = drNomsaUser.Id,
                 StaffNumber = "DOC001"
+            },
+            new Staff
+            {
+                Id = Guid.Parse("550e8400-e29b-41d4-a716-446655441002"),
+                UserId = drThaboUser.Id,
+                StaffNumber = "DOC002"
             }
+        );
+
+        // TimeSlots (Mon-Fri: 09:00-12:00, hourly)
+        modelBuilder.Entity<TimeSlot>().HasData(
+            // Monday
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443101"), DayOfWeek = 1, StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(10, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443102"), DayOfWeek = 1, StartTime = new TimeOnly(10, 0), EndTime = new TimeOnly(11, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443103"), DayOfWeek = 1, StartTime = new TimeOnly(11, 0), EndTime = new TimeOnly(12, 0), IsActive = true, IsBooked = false },
+            // Tuesday
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443201"), DayOfWeek = 2, StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(10, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443202"), DayOfWeek = 2, StartTime = new TimeOnly(10, 0), EndTime = new TimeOnly(11, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443203"), DayOfWeek = 2, StartTime = new TimeOnly(11, 0), EndTime = new TimeOnly(12, 0), IsActive = true, IsBooked = false },
+            // Wednesday
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443301"), DayOfWeek = 3, StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(10, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443302"), DayOfWeek = 3, StartTime = new TimeOnly(10, 0), EndTime = new TimeOnly(11, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443303"), DayOfWeek = 3, StartTime = new TimeOnly(11, 0), EndTime = new TimeOnly(12, 0), IsActive = true, IsBooked = false },
+            // Thursday
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443401"), DayOfWeek = 4, StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(10, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443402"), DayOfWeek = 4, StartTime = new TimeOnly(10, 0), EndTime = new TimeOnly(11, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443403"), DayOfWeek = 4, StartTime = new TimeOnly(11, 0), EndTime = new TimeOnly(12, 0), IsActive = true, IsBooked = false },
+            // Friday
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443501"), DayOfWeek = 5, StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(10, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443502"), DayOfWeek = 5, StartTime = new TimeOnly(10, 0), EndTime = new TimeOnly(11, 0), IsActive = true, IsBooked = false },
+            new TimeSlot { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655443503"), DayOfWeek = 5, StartTime = new TimeOnly(11, 0), EndTime = new TimeOnly(12, 0), IsActive = true, IsBooked = false }
         );
 
         // ❌ Do NOT seed Patients here (dynamic DateOfBirth)
