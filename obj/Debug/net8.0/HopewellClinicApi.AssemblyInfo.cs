@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HopewellClinicApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5ac3598910830dcc74341f587a34598af0625193")]
 [assembly: System.Reflection.AssemblyProductAttribute("HopewellClinicApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HopewellClinicApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

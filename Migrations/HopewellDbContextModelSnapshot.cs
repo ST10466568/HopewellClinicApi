@@ -163,8 +163,8 @@ namespace HopewellClinicApi.Migrations
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441001"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "2012b59e-3df5-442e-a72f-ef7e34c3dbf6",
-                            CreatedAt = new DateTime(2025, 8, 20, 21, 39, 7, 818, DateTimeKind.Utc).AddTicks(2180),
+                            ConcurrencyStamp = "8f7db8e4-85a5-4331-a180-5dd4006c4496",
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 858, DateTimeKind.Utc).AddTicks(6906),
                             Email = "nomsa.mandela@hopewell.com",
                             EmailConfirmed = true,
                             FirstName = "Dr. Nomsa",
@@ -177,15 +177,15 @@ namespace HopewellClinicApi.Migrations
                             PhoneNumber = "+27123456789",
                             PhoneNumberConfirmed = true,
                             TwoFactorEnabled = false,
-                            UpdatedAt = new DateTime(2025, 8, 20, 21, 39, 7, 818, DateTimeKind.Utc).AddTicks(2188),
+                            UpdatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 858, DateTimeKind.Utc).AddTicks(6907),
                             UserName = "nomsa.mandela@hopewell.com"
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441003"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "69cb8011-894f-4010-89e6-55cd9e8fd596",
-                            CreatedAt = new DateTime(2025, 8, 20, 21, 39, 7, 819, DateTimeKind.Utc).AddTicks(5595),
+                            ConcurrencyStamp = "c3d7e6ae-dae1-4cf7-a0da-7ea95c62dcd7",
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(5142),
                             Email = "thabo.sithole@hopewell.com",
                             EmailConfirmed = true,
                             FirstName = "Dr. Thabo",
@@ -198,7 +198,7 @@ namespace HopewellClinicApi.Migrations
                             PhoneNumber = "+27123456790",
                             PhoneNumberConfirmed = true,
                             TwoFactorEnabled = false,
-                            UpdatedAt = new DateTime(2025, 8, 20, 21, 39, 7, 819, DateTimeKind.Utc).AddTicks(5600),
+                            UpdatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(5144),
                             UserName = "thabo.sithole@hopewell.com"
                         });
                 });
@@ -369,12 +369,52 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440000"),
-                            CreatedAt = new DateTime(2025, 8, 20, 21, 39, 7, 820, DateTimeKind.Utc).AddTicks(1702),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9328),
                             Description = "General medical consultation and examination",
                             DurationMinutes = 30,
                             IsActive = true,
                             Name = "General Consultation",
-                            UpdatedAt = new DateTime(2025, 8, 20, 21, 39, 7, 820, DateTimeKind.Utc).AddTicks(1704)
+                            UpdatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9329)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655440001"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9919),
+                            Description = "Health services for infants and children",
+                            DurationMinutes = 30,
+                            IsActive = true,
+                            Name = "Pediatrics Consultation",
+                            UpdatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9919)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655440002"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9925),
+                            Description = "Routine dental examination and cleaning",
+                            DurationMinutes = 45,
+                            IsActive = true,
+                            Name = "Dental Checkup",
+                            UpdatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9925)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655440003"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9931),
+                            Description = "Physical therapy for rehabilitation",
+                            DurationMinutes = 60,
+                            IsActive = true,
+                            Name = "Physiotherapy Session",
+                            UpdatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9931)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655440004"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9936),
+                            Description = "Routine immunizations and boosters",
+                            DurationMinutes = 20,
+                            IsActive = true,
+                            Name = "Vaccination",
+                            UpdatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 859, DateTimeKind.Utc).AddTicks(9936)
                         });
                 });
 
@@ -421,11 +461,20 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441000"),
-                            CreatedAt = new DateTime(2025, 8, 20, 21, 39, 7, 820, DateTimeKind.Utc).AddTicks(4051),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(436),
                             IsActive = true,
                             StaffNumber = "DOC001",
-                            UpdatedAt = new DateTime(2025, 8, 20, 21, 39, 7, 820, DateTimeKind.Utc).AddTicks(4053),
+                            UpdatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(437),
                             UserId = new Guid("550e8400-e29b-41d4-a716-446655441001")
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655441002"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(725),
+                            IsActive = true,
+                            StaffNumber = "DOC002",
+                            UpdatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(725),
+                            UserId = new Guid("550e8400-e29b-41d4-a716-446655441003")
                         });
                 });
 
@@ -462,6 +511,158 @@ namespace HopewellClinicApi.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("time_slots");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443101"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1004),
+                            DayOfWeek = 1,
+                            EndTime = new TimeOnly(10, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(9, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443102"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1593),
+                            DayOfWeek = 1,
+                            EndTime = new TimeOnly(11, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(10, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443103"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1600),
+                            DayOfWeek = 1,
+                            EndTime = new TimeOnly(12, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(11, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443201"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1605),
+                            DayOfWeek = 2,
+                            EndTime = new TimeOnly(10, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(9, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443202"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1611),
+                            DayOfWeek = 2,
+                            EndTime = new TimeOnly(11, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(10, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443203"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1615),
+                            DayOfWeek = 2,
+                            EndTime = new TimeOnly(12, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(11, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443301"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1620),
+                            DayOfWeek = 3,
+                            EndTime = new TimeOnly(10, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(9, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443302"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1626),
+                            DayOfWeek = 3,
+                            EndTime = new TimeOnly(11, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(10, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443303"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1631),
+                            DayOfWeek = 3,
+                            EndTime = new TimeOnly(12, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(11, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443401"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1635),
+                            DayOfWeek = 4,
+                            EndTime = new TimeOnly(10, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(9, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443402"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1640),
+                            DayOfWeek = 4,
+                            EndTime = new TimeOnly(11, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(10, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443403"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1644),
+                            DayOfWeek = 4,
+                            EndTime = new TimeOnly(12, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(11, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443501"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1650),
+                            DayOfWeek = 5,
+                            EndTime = new TimeOnly(10, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(9, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443502"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1718),
+                            DayOfWeek = 5,
+                            EndTime = new TimeOnly(11, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(10, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("550e8400-e29b-41d4-a716-446655443503"),
+                            CreatedAt = new DateTime(2025, 8, 21, 20, 33, 10, 860, DateTimeKind.Utc).AddTicks(1723),
+                            DayOfWeek = 5,
+                            EndTime = new TimeOnly(12, 0, 0),
+                            IsActive = true,
+                            IsBooked = false,
+                            StartTime = new TimeOnly(11, 0, 0)
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
