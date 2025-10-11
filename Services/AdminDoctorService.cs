@@ -61,13 +61,11 @@ namespace HopewellClinicApi.Services
                 })
                 .ToListAsync();
 
-            // If no schedules exist, return default schedule
-            if (!schedules.Any())
-            {
-                return GetDefaultSchedule();
-            }
-
-            return schedules;
+            // Always return a complete 7-day schedule
+            // If some days are missing from database, fill them with default values
+            var completeSchedule = GetCompleteWeeklySchedule(schedules);
+            
+            return completeSchedule;
         }
 
         public async Task<bool> UpdateDoctorShiftScheduleAsync(Guid doctorId, List<ShiftScheduleDto> shiftData)
@@ -143,6 +141,35 @@ namespace HopewellClinicApi.Services
             return await _context.Staff
                 .Where(s => s.Id == doctorId && s.IsActive)
                 .AnyAsync();
+        }
+
+        private List<ShiftScheduleDto> GetCompleteWeeklySchedule(List<ShiftScheduleDto> existingSchedules)
+        {
+            var daysOfWeek = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+            var completeSchedule = new List<ShiftScheduleDto>();
+            
+            foreach (var day in daysOfWeek)
+            {
+                var existingSchedule = existingSchedules.FirstOrDefault(s => s.DayOfWeek == day);
+                if (existingSchedule != null)
+                {
+                    // Use existing schedule from database
+                    completeSchedule.Add(existingSchedule);
+                }
+                else
+                {
+                    // Use default schedule for missing days
+                    completeSchedule.Add(new ShiftScheduleDto
+                    {
+                        DayOfWeek = day,
+                        StartTime = "09:00",
+                        EndTime = "17:00",
+                        IsActive = day != "Saturday" && day != "Sunday" // Weekends inactive by default
+                    });
+                }
+            }
+            
+            return completeSchedule;
         }
 
         private List<ShiftScheduleDto> GetDefaultSchedule()
