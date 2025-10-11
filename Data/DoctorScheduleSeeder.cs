@@ -18,12 +18,12 @@ namespace HopewellClinicApi.Data
             }
 
             var daysOfWeek = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
-            var schedules = new List<DoctorSchedule>();
+            var schedules = new List<ShiftSchedule>();
 
             foreach (var doctor in doctors)
             {
                 // Check if doctor already has schedules
-                var existingSchedules = await context.DoctorSchedules
+                var existingSchedules = await context.ShiftSchedules
                     .Where(ds => ds.DoctorId == doctor.Id)
                     .AnyAsync();
 
@@ -36,38 +36,25 @@ namespace HopewellClinicApi.Data
                 {
                     var isWeekend = dayOfWeek == "Saturday" || dayOfWeek == "Sunday";
                     
-                    // Create schedule for the next 30 days for this day of week
-                    var startDate = DateTime.Today;
-                    var endDate = startDate.AddDays(30);
-
-                    for (var date = startDate; date <= endDate; date = date.AddDays(1))
+                    var schedule = new ShiftSchedule
                     {
-                        if (date.DayOfWeek.ToString() == dayOfWeek)
-                        {
-                            var schedule = new DoctorSchedule
-                            {
-                                Id = Guid.NewGuid(),
-                                DoctorId = doctor.Id,
-                                Date = date,
-                                DayOfWeek = dayOfWeek,
-                                IsActive = !isWeekend, // Weekends are inactive by default
-                                ShiftStart = isWeekend ? TimeSpan.Zero : new TimeSpan(9, 0, 0), // 9:00 AM
-                                ShiftEnd = isWeekend ? TimeSpan.Zero : new TimeSpan(17, 0, 0), // 5:00 PM
-                                BreakStart = isWeekend ? null : new TimeSpan(12, 0, 0), // 12:00 PM
-                                BreakEnd = isWeekend ? null : new TimeSpan(13, 0, 0), // 1:00 PM
-                                CreatedAt = DateTime.UtcNow,
-                                UpdatedAt = DateTime.UtcNow
-                            };
+                        Id = Guid.NewGuid(),
+                        DoctorId = doctor.Id,
+                        DayOfWeek = dayOfWeek,
+                        IsActive = !isWeekend, // Weekends are inactive by default
+                        StartTime = isWeekend ? TimeSpan.Zero : new TimeSpan(9, 0, 0), // 9:00 AM
+                        EndTime = isWeekend ? TimeSpan.Zero : new TimeSpan(17, 0, 0), // 5:00 PM
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
 
-                            schedules.Add(schedule);
-                        }
-                    }
+                    schedules.Add(schedule);
                 }
             }
 
             if (schedules.Any())
             {
-                context.DoctorSchedules.AddRange(schedules);
+                context.ShiftSchedules.AddRange(schedules);
                 await context.SaveChangesAsync();
             }
         }

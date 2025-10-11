@@ -85,7 +85,7 @@ namespace HopewellClinicApi.DTOs
     {
         public DateTime Date { get; set; }
         public List<AppointmentWithApprovalResponse> Appointments { get; set; } = new();
-        public List<DoctorShiftResponse> Shifts { get; set; } = new();
+        public List<object> Shifts { get; set; } = new();
     }
 
     // Patient Details for Doctors

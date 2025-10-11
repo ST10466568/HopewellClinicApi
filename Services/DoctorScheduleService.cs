@@ -39,9 +39,8 @@ namespace HopewellClinicApi.Services
 
             foreach (var dayOfWeek in daysOfWeek)
             {
-                var existingSchedule = await _context.DoctorSchedules
+                var existingSchedule = await _context.ShiftSchedules
                     .Where(ds => ds.DoctorId == doctorId && ds.DayOfWeek == dayOfWeek)
-                    .OrderBy(ds => ds.Date)
                     .FirstOrDefaultAsync();
 
                 if (existingSchedule != null)
@@ -52,10 +51,10 @@ namespace HopewellClinicApi.Services
                         DoctorId = existingSchedule.DoctorId,
                         DayOfWeek = existingSchedule.DayOfWeek,
                         IsActive = existingSchedule.IsActive,
-                        ShiftStart = existingSchedule.ShiftStart,
-                        ShiftEnd = existingSchedule.ShiftEnd,
-                        BreakStart = existingSchedule.BreakStart,
-                        BreakEnd = existingSchedule.BreakEnd,
+                        ShiftStart = existingSchedule.StartTime,
+                        ShiftEnd = existingSchedule.EndTime,
+                        BreakStart = new TimeSpan(12, 0, 0), // Default break
+                        BreakEnd = new TimeSpan(13, 0, 0),
                         CreatedAt = existingSchedule.CreatedAt,
                         UpdatedAt = existingSchedule.UpdatedAt
                     });
@@ -93,14 +92,14 @@ namespace HopewellClinicApi.Services
             }
 
             // Remove existing schedules for this doctor
-            var existingSchedules = await _context.DoctorSchedules
+            var existingSchedules = await _context.ShiftSchedules
                 .Where(ds => ds.DoctorId == doctorId)
                 .ToListAsync();
 
-            _context.DoctorSchedules.RemoveRange(existingSchedules);
+            _context.ShiftSchedules.RemoveRange(existingSchedules);
 
             // Create new schedules
-            var newSchedules = new List<DoctorSchedule>();
+            var newSchedules = new List<ShiftSchedule>();
             var daysOfWeek = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
 
             foreach (var dayOfWeek in daysOfWeek)
@@ -110,34 +109,22 @@ namespace HopewellClinicApi.Services
                 if (shiftDto != null && TimeSpan.TryParse(shiftDto.StartTime, out var startTime) && 
                     TimeSpan.TryParse(shiftDto.EndTime, out var endTime))
                 {
-                    // Create schedule for the next 30 days for this day of week
-                    var startDate = DateTime.Today;
-                    for (int i = 0; i < 30; i++)
+                    var schedule = new ShiftSchedule
                     {
-                        var scheduleDate = startDate.AddDays(i);
-                        if (scheduleDate.DayOfWeek.ToString() == dayOfWeek)
-                        {
-                            var schedule = new DoctorSchedule
-                            {
-                                Id = Guid.NewGuid(),
-                                DoctorId = doctorId,
-                                Date = scheduleDate,
-                                DayOfWeek = dayOfWeek,
-                                ShiftStart = startTime,
-                                ShiftEnd = endTime,
-                                IsActive = shiftDto.IsActive,
-                                BreakStart = new TimeSpan(12, 0, 0), // Default break
-                                BreakEnd = new TimeSpan(13, 0, 0),
-                                CreatedAt = DateTime.UtcNow,
-                                UpdatedAt = DateTime.UtcNow
-                            };
-                            newSchedules.Add(schedule);
-                        }
-                    }
+                        Id = Guid.NewGuid(),
+                        DoctorId = doctorId,
+                        DayOfWeek = dayOfWeek,
+                        StartTime = startTime,
+                        EndTime = endTime,
+                        IsActive = shiftDto.IsActive,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    newSchedules.Add(schedule);
                 }
             }
 
-            _context.DoctorSchedules.AddRange(newSchedules);
+            _context.ShiftSchedules.AddRange(newSchedules);
             await _context.SaveChangesAsync();
 
             // Return the updated weekly shifts
@@ -156,32 +143,20 @@ namespace HopewellClinicApi.Services
                 throw new ArgumentException("Doctor not found");
             }
 
-            var query = _context.DoctorSchedules
-                .Where(ds => ds.DoctorId == doctorId);
-
-            if (startDate.HasValue)
-            {
-                query = query.Where(ds => ds.Date >= startDate.Value.Date);
-            }
-
-            if (endDate.HasValue)
-            {
-                query = query.Where(ds => ds.Date <= endDate.Value.Date);
-            }
-
-            var schedules = await query
+            // Get weekly shift schedules (not date-specific)
+            var schedules = await _context.ShiftSchedules
+                .Where(ds => ds.DoctorId == doctorId)
                 .OrderBy(ds => ds.DayOfWeek)
-                .ThenBy(ds => ds.Date)
                 .Select(ds => new DoctorScheduleDto
                 {
                     Id = ds.Id,
                     DoctorId = ds.DoctorId,
                     DayOfWeek = ds.DayOfWeek,
                     IsActive = ds.IsActive,
-                    ShiftStart = ds.ShiftStart,
-                    ShiftEnd = ds.ShiftEnd,
-                    BreakStart = ds.BreakStart,
-                    BreakEnd = ds.BreakEnd,
+                    ShiftStart = ds.StartTime,
+                    ShiftEnd = ds.EndTime,
+                    BreakStart = new TimeSpan(12, 0, 0), // Default break
+                    BreakEnd = new TimeSpan(13, 0, 0),
                     CreatedAt = ds.CreatedAt,
                     UpdatedAt = ds.UpdatedAt
                 })
@@ -208,14 +183,14 @@ namespace HopewellClinicApi.Services
             }
 
             // Remove existing schedules for this doctor
-            var existingSchedules = await _context.DoctorSchedules
+            var existingSchedules = await _context.ShiftSchedules
                 .Where(ds => ds.DoctorId == doctorId)
                 .ToListAsync();
 
-            _context.DoctorSchedules.RemoveRange(existingSchedules);
+            _context.ShiftSchedules.RemoveRange(existingSchedules);
 
             // Add new schedules
-            var newSchedules = new List<DoctorSchedule>();
+            var newSchedules = new List<ShiftSchedule>();
             var daysOfWeek = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
 
             foreach (var dayOfWeek in daysOfWeek)
@@ -224,36 +199,23 @@ namespace HopewellClinicApi.Services
                 
                 if (scheduleItem != null)
                 {
-                    // Create schedule for the next 30 days for this day of week
-                    var startDate = DateTime.Today;
-                    var endDate = startDate.AddDays(30);
-
-                    for (var date = startDate; date <= endDate; date = date.AddDays(1))
+                    var schedule = new ShiftSchedule
                     {
-                        if (date.DayOfWeek.ToString() == dayOfWeek)
-                        {
-                            var schedule = new DoctorSchedule
-                            {
-                                Id = Guid.NewGuid(),
-                                DoctorId = doctorId,
-                                Date = date,
-                                DayOfWeek = dayOfWeek,
-                                IsActive = scheduleItem.IsActive,
-                                ShiftStart = scheduleItem.ShiftStart,
-                                ShiftEnd = scheduleItem.ShiftEnd,
-                                BreakStart = scheduleItem.BreakStart,
-                                BreakEnd = scheduleItem.BreakEnd,
-                                CreatedAt = DateTime.UtcNow,
-                                UpdatedAt = DateTime.UtcNow
-                            };
+                        Id = Guid.NewGuid(),
+                        DoctorId = doctorId,
+                        DayOfWeek = dayOfWeek,
+                        StartTime = scheduleItem.ShiftStart,
+                        EndTime = scheduleItem.ShiftEnd,
+                        IsActive = scheduleItem.IsActive,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
 
-                            newSchedules.Add(schedule);
-                        }
-                    }
+                    newSchedules.Add(schedule);
                 }
             }
 
-            _context.DoctorSchedules.AddRange(newSchedules);
+            _context.ShiftSchedules.AddRange(newSchedules);
             await _context.SaveChangesAsync();
 
             return await GetDoctorScheduleAsync(doctorId);
@@ -263,10 +225,9 @@ namespace HopewellClinicApi.Services
         public async Task<DoctorAvailabilityManagementResponse> CheckDoctorAvailabilityAsync(Guid doctorId, DateTime date, TimeSpan? time = null)
         {
             var dayOfWeek = date.DayOfWeek.ToString();
-            var schedule = await _context.DoctorSchedules
+            var schedule = await _context.ShiftSchedules
                 .FirstOrDefaultAsync(ds => ds.DoctorId == doctorId && 
                                          ds.DayOfWeek == dayOfWeek && 
-                                         ds.Date == date.Date && 
                                          ds.IsActive);
 
             if (schedule == null)
@@ -281,28 +242,14 @@ namespace HopewellClinicApi.Services
             if (time.HasValue)
             {
                 // Check if time is within shift hours
-                if (time.Value < schedule.ShiftStart || time.Value >= schedule.ShiftEnd)
+                if (time.Value < schedule.StartTime || time.Value >= schedule.EndTime)
                 {
                     return new DoctorAvailabilityManagementResponse
                     {
                         IsAvailable = false,
                         Reason = "Time is outside doctor's shift hours",
-                        NextAvailableTime = schedule.ShiftStart
+                        NextAvailableTime = schedule.StartTime
                     };
-                }
-
-                // Check if time is during break
-                if (schedule.BreakStart.HasValue && schedule.BreakEnd.HasValue)
-                {
-                    if (time.Value >= schedule.BreakStart.Value && time.Value < schedule.BreakEnd.Value)
-                    {
-                        return new DoctorAvailabilityManagementResponse
-                        {
-                            IsAvailable = false,
-                            Reason = "Doctor is on break at this time",
-                            NextAvailableTime = schedule.BreakEnd.Value
-                        };
-                    }
                 }
 
                 // Check for conflicting appointments
@@ -341,10 +288,9 @@ namespace HopewellClinicApi.Services
         public async Task<List<TimeSlotEnhancedDto>> GenerateAvailableSlotsAsync(Guid doctorId, DateTime date, int serviceDuration = 30)
         {
             var dayOfWeek = date.DayOfWeek.ToString();
-            var schedule = await _context.DoctorSchedules
+            var schedule = await _context.ShiftSchedules
                 .FirstOrDefaultAsync(ds => ds.DoctorId == doctorId && 
                                          ds.DayOfWeek == dayOfWeek && 
-                                         ds.Date == date.Date && 
                                          ds.IsActive);
 
             if (schedule == null)
@@ -358,23 +304,16 @@ namespace HopewellClinicApi.Services
                 .ToListAsync();
 
             var slots = new List<TimeSlotEnhancedDto>();
-            var currentTime = schedule.ShiftStart;
+            var currentTime = schedule.StartTime;
 
-            while (currentTime.Add(TimeSpan.FromMinutes(serviceDuration)) <= schedule.ShiftEnd)
+            while (currentTime.Add(TimeSpan.FromMinutes(serviceDuration)) <= schedule.EndTime)
             {
                 var endTime = currentTime.Add(TimeSpan.FromMinutes(serviceDuration));
                 var isDuringBreak = false;
                 var conflictReason = string.Empty;
 
-                // Check if slot is during break time
-                if (schedule.BreakStart.HasValue && schedule.BreakEnd.HasValue)
-                {
-                    if (currentTime < schedule.BreakEnd.Value && endTime > schedule.BreakStart.Value)
-                    {
-                        isDuringBreak = true;
-                        conflictReason = "During break time";
-                    }
-                }
+                // Check if slot is during break time (no break times in ShiftSchedule)
+                // Skip break time check since ShiftSchedule doesn't have break times
 
                 // Check for conflicting appointments
                 var isAvailable = true;
@@ -419,12 +358,11 @@ namespace HopewellClinicApi.Services
             var doctors = await _context.Staff
                 .Include(s => s.User)
                 .Where(s => s.IsActive)
-                .Join(_context.DoctorSchedules,
+                .Join(_context.ShiftSchedules,
                     s => s.Id,
                     ds => ds.DoctorId,
                     (s, ds) => new { Staff = s, Schedule = ds })
                 .Where(x => x.Schedule.DayOfWeek == dayOfWeek && 
-                           x.Schedule.Date == date.Date && 
                            x.Schedule.IsActive)
                 .Select(x => new DoctorOnDutyEnhancedDto
                 {
@@ -433,13 +371,13 @@ namespace HopewellClinicApi.Services
                     LastName = x.Staff.User.LastName,
                     Specialty = "General Practice", // Default specialty
                     Rating = 4.5, // Default rating
-                    ShiftStart = x.Schedule.ShiftStart,
-                    ShiftEnd = x.Schedule.ShiftEnd,
+                    ShiftStart = x.Schedule.StartTime,
+                    ShiftEnd = x.Schedule.EndTime,
                     IsAvailable = true,
                     Services = new List<string> { "consultation", "follow-up" },
                     DayOfWeek = x.Schedule.DayOfWeek,
-                    BreakStart = x.Schedule.BreakStart,
-                    BreakEnd = x.Schedule.BreakEnd
+                    BreakStart = new TimeSpan(12, 0, 0), // Default break
+                    BreakEnd = new TimeSpan(13, 0, 0)
                 })
                 .ToListAsync();
 
@@ -458,7 +396,7 @@ namespace HopewellClinicApi.Services
                 throw new ArgumentException("Doctor not found");
             }
 
-            var schedules = await _context.DoctorSchedules
+            var schedules = await _context.ShiftSchedules
                 .Where(ds => ds.DoctorId == doctorId && ds.IsActive)
                 .GroupBy(ds => ds.DayOfWeek)
                 .Select(g => new
@@ -473,7 +411,7 @@ namespace HopewellClinicApi.Services
             var offDays = allDays.Except(workingDays).ToList();
 
             var totalWeeklyHours = schedules.Sum(s => 
-                s.Schedule.ShiftEnd.Subtract(s.Schedule.ShiftStart).TotalHours);
+                s.Schedule.EndTime.Subtract(s.Schedule.StartTime).TotalHours);
 
             var lastUpdated = schedules.Any() ? schedules.Max(s => s.Schedule.UpdatedAt) : DateTime.UtcNow;
 
@@ -493,7 +431,7 @@ namespace HopewellClinicApi.Services
         // Initialize default schedules for a doctor
         public async Task InitializeDefaultScheduleAsync(Guid doctorId)
         {
-            var existingSchedules = await _context.DoctorSchedules
+            var existingSchedules = await _context.ShiftSchedules
                 .Where(ds => ds.DoctorId == doctorId)
                 .ToListAsync();
 
@@ -503,41 +441,28 @@ namespace HopewellClinicApi.Services
             }
 
             var daysOfWeek = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
-            var newSchedules = new List<DoctorSchedule>();
+            var newSchedules = new List<ShiftSchedule>();
 
             foreach (var dayOfWeek in daysOfWeek)
             {
                 var isWeekend = dayOfWeek == "Saturday" || dayOfWeek == "Sunday";
                 
-                // Create schedule for the next 30 days for this day of week
-                var startDate = DateTime.Today;
-                var endDate = startDate.AddDays(30);
-
-                for (var date = startDate; date <= endDate; date = date.AddDays(1))
+                var schedule = new ShiftSchedule
                 {
-                    if (date.DayOfWeek.ToString() == dayOfWeek)
-                    {
-                        var schedule = new DoctorSchedule
-                        {
-                            Id = Guid.NewGuid(),
-                            DoctorId = doctorId,
-                            Date = date,
-                            DayOfWeek = dayOfWeek,
-                            IsActive = !isWeekend, // Weekends are inactive by default
-                            ShiftStart = isWeekend ? TimeSpan.Zero : new TimeSpan(9, 0, 0), // 9:00 AM
-                            ShiftEnd = isWeekend ? TimeSpan.Zero : new TimeSpan(17, 0, 0), // 5:00 PM
-                            BreakStart = isWeekend ? null : new TimeSpan(12, 0, 0), // 12:00 PM
-                            BreakEnd = isWeekend ? null : new TimeSpan(13, 0, 0), // 1:00 PM
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
+                    Id = Guid.NewGuid(),
+                    DoctorId = doctorId,
+                    DayOfWeek = dayOfWeek,
+                    IsActive = !isWeekend, // Weekends are inactive by default
+                    StartTime = isWeekend ? TimeSpan.Zero : new TimeSpan(9, 0, 0), // 9:00 AM
+                    EndTime = isWeekend ? TimeSpan.Zero : new TimeSpan(17, 0, 0), // 5:00 PM
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
 
-                        newSchedules.Add(schedule);
-                    }
-                }
+                newSchedules.Add(schedule);
             }
 
-            _context.DoctorSchedules.AddRange(newSchedules);
+            _context.ShiftSchedules.AddRange(newSchedules);
             await _context.SaveChangesAsync();
         }
     }

@@ -5,6 +5,7 @@ using HopewellClinicApi.Data;
 using HopewellClinicApi.DTOs;
 using HopewellClinicApi.Models;
 using HopewellClinicApi.Attributes;
+using HopewellClinicApi.Services;
 
 namespace HopewellClinicApi.Controllers
 {
@@ -13,33 +14,35 @@ namespace HopewellClinicApi.Controllers
     public class DoctorController : ControllerBase
     {
         private readonly HopewellDbContext _context;
+        private readonly DoctorScheduleService _scheduleService;
 
-        public DoctorController(HopewellDbContext context)
+        public DoctorController(HopewellDbContext context, DoctorScheduleService scheduleService)
         {
             _context = context;
+            _scheduleService = scheduleService;
         }
 
         /// <summary>
         /// Get all doctors for admin schedule view
         /// </summary>
         [HttpGet]
-        [JwtAuthorize]
+        [Authorize]
         public async Task<ActionResult<IEnumerable<object>>> GetAllDoctors()
         {
             try
             {
                 var doctors = await _context.Staff
                     .Include(s => s.User)
-                    .Where(s => s.IsActive && s.User.IsActive)
+                    .Where(s => s.IsActive && s.User != null && s.User.IsActive)
                     .Select(s => new
                     {
                         id = s.Id,
-                        firstName = s.User.FirstName,
-                        lastName = s.User.LastName,
+                        firstName = s.User != null ? s.User.FirstName : "",
+                        lastName = s.User != null ? s.User.LastName : "",
                         specialization = "General Practice",
-                        isActive = s.IsActive && s.User.IsActive,
-                        email = s.User.Email,
-                        phone = s.User.PhoneNumber,
+                        isActive = s.IsActive && s.User != null && s.User.IsActive,
+                        email = s.User != null ? s.User.Email : "",
+                        phone = s.User != null ? s.User.PhoneNumber : "",
                         staffNumber = s.StaffNumber
                     })
                     .OrderBy(d => d.lastName)
@@ -55,7 +58,7 @@ namespace HopewellClinicApi.Controllers
         }
 
         [HttpGet("{doctorId}/patients")]
-        [AuthorizeDoctor]
+        [Authorize]
         public async Task<ActionResult<IEnumerable<PatientSummaryDto>>> GetDoctorPatients(Guid doctorId)
         {
             try
@@ -74,15 +77,15 @@ namespace HopewellClinicApi.Controllers
                 var patients = await _context.Appointments
                     .Include(a => a.Patient)
                         .ThenInclude(p => p.User)
-                    .Where(a => a.StaffId == doctorId)
+                    .Where(a => a.StaffId == doctorId && a.Patient != null && a.Patient.User != null && a.Patient.User != null)
                     .Select(a => new PatientSummaryDto
                     {
                         Id = a.Patient.Id,
-                        FirstName = a.Patient.User.FirstName,
-                        LastName = a.Patient.User.LastName,
+                        FirstName = a.Patient.User != null ? a.Patient.User.FirstName : "",
+                        LastName = a.Patient.User != null ? a.Patient.User.LastName : "",
                         PatientNumber = a.Patient.PatientNumber,
-                        Phone = a.Patient.User.PhoneNumber,
-                        Email = a.Patient.User.Email
+                        Phone = a.Patient.User != null ? a.Patient.User.PhoneNumber : "",
+                        Email = a.Patient.User != null ? a.Patient.User.Email : ""
                     })
                     .Distinct()
                     .ToListAsync();
@@ -96,7 +99,7 @@ namespace HopewellClinicApi.Controllers
         }
 
         [HttpGet("{doctorId}/appointments/upcoming")]
-        [AuthorizeDoctor]
+        [Authorize]
         public async Task<ActionResult<IEnumerable<AppointmentResponse>>> GetUpcomingAppointments(Guid doctorId)
         {
             try
@@ -133,14 +136,14 @@ namespace HopewellClinicApi.Controllers
                             Description = a.Service.Description,
                             DurationMinutes = a.Service.DurationMinutes
                         },
-                        Patient = a.Patient != null ? new PatientResponse
+                        Patient = a.Patient != null && a.Patient.User != null && a.Patient.User != null ? new PatientResponse
                         {
                             Id = a.Patient.Id,
                             FirstName = a.Patient.User.FirstName,
                             LastName = a.Patient.User.LastName,
                             Phone = a.Patient.User.PhoneNumber ?? ""
                         } : null,
-                        Staff = a.Staff != null ? new StaffResponse
+                        Staff = a.Staff != null && a.Staff.User != null && a.Staff.User != null ? new StaffResponse
                         {
                             Id = a.Staff.Id,
                             UserId = a.Staff.UserId,
@@ -276,74 +279,94 @@ namespace HopewellClinicApi.Controllers
 
         // NEW ENDPOINTS FOR DOCTOR DASHBOARD
 
-        // Doctor Shift Management
-        [HttpGet("{doctorId}/shifts")]
-        [AuthorizeDoctor]
-        public async Task<ActionResult<IEnumerable<DoctorShiftResponse>>> GetDoctorShifts(Guid doctorId)
+        // Test endpoint to check if DoctorController works
+        [HttpGet("test-simple")]
+        [Authorize]
+        public ActionResult TestSimple()
+        {
+            return Ok(new { message = "DoctorController simple test works", timestamp = DateTime.UtcNow });
+        }
+
+        [HttpGet("test-db")]
+        [Authorize]
+        public async Task<ActionResult> TestDatabase()
         {
             try
             {
-                var shifts = await _context.DoctorShifts
-                    .Where(ds => ds.DoctorId == doctorId)
-                    .OrderBy(ds => ds.DayOfWeek)
-                    .ThenBy(ds => ds.StartTime)
-                    .Select(ds => new DoctorShiftResponse
-                    {
-                        Id = ds.Id,
-                        DoctorId = ds.DoctorId,
-                        DayOfWeek = ds.DayOfWeek,
-                        StartTime = ds.StartTime,
-                        EndTime = ds.EndTime,
-                        IsActive = ds.IsActive,
-                        CreatedAt = ds.CreatedAt,
-                        UpdatedAt = ds.UpdatedAt
-                    })
-                    .ToListAsync();
-
-                return Ok(shifts);
+                var count = await _context.ShiftSchedules.CountAsync();
+                return Ok(new { message = "Database connection works", shiftSchedulesCount = count, timestamp = DateTime.UtcNow });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Internal server error" });
+                return StatusCode(500, new { error = "Database error", message = ex.Message });
+            }
+        }
+
+        // Doctor Shift Management
+        [HttpGet("{doctorId}/shifts")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<object>>> GetDoctorShifts(Guid doctorId)
+        {
+            try
+            {
+                // Use the service layer like DoctorScheduleController does
+                var shifts = await _scheduleService.GetDoctorWeeklyShiftsAsync(doctorId);
+                
+                var shiftResults = shifts.Select(s => new
+                {
+                    id = s.Id,
+                    dayOfWeek = s.DayOfWeek,
+                    startTime = s.ShiftStart.ToString(@"hh\:mm"),
+                    endTime = s.ShiftEnd.ToString(@"hh\:mm"),
+                    isActive = s.IsActive,
+                    doctorId = s.DoctorId
+                }).ToList();
+
+                return Ok(shiftResults);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(new { error = "DOCTOR_NOT_FOUND", message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "INTERNAL_ERROR", message = "An error occurred while retrieving the shifts" });
             }
         }
 
         [HttpPut("{doctorId}/shifts")]
-        public async Task<ActionResult> UpdateDoctorShifts(Guid doctorId, [FromBody] List<CreateDoctorShiftRequest> shifts)
+        [Authorize]
+        public async Task<ActionResult> UpdateDoctorShifts(Guid doctorId, [FromBody] UpdateDoctorShiftsRequest request)
         {
             try
             {
-                // Remove existing shifts for this doctor
-                var existingShifts = await _context.DoctorShifts
-                    .Where(ds => ds.DoctorId == doctorId)
-                    .ToListAsync();
-
-                _context.DoctorShifts.RemoveRange(existingShifts);
-
-                // Add new shifts
-                foreach (var shiftRequest in shifts)
+                // Validate request
+                if (request?.Shifts == null || !request.Shifts.Any())
                 {
-                    var shift = new DoctorShift
-                    {
-                        DoctorId = doctorId,
-                        DayOfWeek = shiftRequest.DayOfWeek,
-                        StartTime = shiftRequest.StartTime,
-                        EndTime = shiftRequest.EndTime,
-                        IsActive = shiftRequest.IsActive,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-
-                    _context.DoctorShifts.Add(shift);
+                    return BadRequest(new { error = "No shifts provided" });
                 }
 
-                await _context.SaveChangesAsync();
+                // Convert DTOs to service DTOs
+                var shiftDtos = request.Shifts.Select(s => new DoctorShiftDto
+                {
+                    DayOfWeek = s.DayOfWeek,
+                    StartTime = s.StartTime,
+                    EndTime = s.EndTime,
+                    IsActive = s.IsActive
+                }).ToList();
+
+                // Use the service layer
+                await _scheduleService.UpdateDoctorWeeklyShiftsAsync(doctorId, shiftDtos);
 
                 return Ok(new { message = "Doctor shifts updated successfully" });
             }
-            catch (Exception)
+            catch (ArgumentException ex)
             {
-                return StatusCode(500, new { error = "Internal server error" });
+                return NotFound(new { error = "DOCTOR_NOT_FOUND", message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "INTERNAL_ERROR", message = "An error occurred while updating the shifts" });
             }
         }
 
@@ -409,7 +432,7 @@ namespace HopewellClinicApi.Controllers
 
         // Enhanced Doctor Appointments
         [HttpGet("{doctorId}/appointments")]
-        [AuthorizeDoctor]
+        [Authorize]
         public async Task<ActionResult<IEnumerable<AppointmentWithApprovalResponse>>> GetAllDoctorAppointments(Guid doctorId)
         {
             try
@@ -452,7 +475,7 @@ namespace HopewellClinicApi.Controllers
                             LastName = a.Patient.User.LastName,
                             Phone = a.Patient.User.PhoneNumber ?? ""
                         },
-                        Staff = a.Staff != null ? new StaffResponse
+                        Staff = a.Staff != null && a.Staff.User != null ? new StaffResponse
                         {
                             Id = a.Staff.Id,
                             UserId = a.Staff.UserId,
@@ -475,7 +498,7 @@ namespace HopewellClinicApi.Controllers
         }
 
         [HttpGet("{doctorId}/schedule")]
-        [AuthorizeDoctor]
+        [Authorize]
         public async Task<ActionResult<DoctorScheduleResponse>> GetDoctorSchedule(Guid doctorId, [FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             try
@@ -520,7 +543,7 @@ namespace HopewellClinicApi.Controllers
                             LastName = a.Patient.User.LastName,
                             Phone = a.Patient.User.PhoneNumber ?? ""
                         },
-                        Staff = a.Staff != null ? new StaffResponse
+                        Staff = a.Staff != null && a.Staff.User != null ? new StaffResponse
                         {
                             Id = a.Staff.Id,
                             UserId = a.Staff.UserId,
@@ -534,26 +557,25 @@ namespace HopewellClinicApi.Controllers
                     })
                     .ToListAsync();
 
-                var shifts = await _context.DoctorShifts
+                var shiftSchedules = await _context.ShiftSchedules
                     .Where(ds => ds.DoctorId == doctorId && ds.IsActive)
-                    .Select(ds => new DoctorShiftResponse
-                    {
-                        Id = ds.Id,
-                        DoctorId = ds.DoctorId,
-                        DayOfWeek = ds.DayOfWeek,
-                        StartTime = ds.StartTime,
-                        EndTime = ds.EndTime,
-                        IsActive = ds.IsActive,
-                        CreatedAt = ds.CreatedAt,
-                        UpdatedAt = ds.UpdatedAt
-                    })
                     .ToListAsync();
+
+                var shifts = shiftSchedules.Select(ds => new
+                {
+                    id = ds.Id,
+                    dayOfWeek = ds.DayOfWeek,
+                    startTime = ds.StartTime.ToString(@"hh\:mm"),
+                    endTime = ds.EndTime.ToString(@"hh\:mm"),
+                    isActive = ds.IsActive,
+                    doctorId = ds.DoctorId
+                }).ToList();
 
                 var response = new DoctorScheduleResponse
                 {
                     Date = startDate,
                     Appointments = appointments,
-                    Shifts = shifts
+                    Shifts = shifts.Cast<object>().ToList()
                 };
 
                 return Ok(response);
@@ -615,7 +637,7 @@ namespace HopewellClinicApi.Controllers
                             LastName = a.Patient.User.LastName,
                             Phone = a.Patient.User.PhoneNumber ?? ""
                         },
-                        Staff = a.Staff != null ? new StaffResponse
+                        Staff = a.Staff != null && a.Staff.User != null ? new StaffResponse
                         {
                             Id = a.Staff.Id,
                             UserId = a.Staff.UserId,
@@ -652,6 +674,21 @@ namespace HopewellClinicApi.Controllers
             {
                 return StatusCode(500, new { error = "Internal server error" });
             }
+        }
+
+        private int GetDayOfWeekNumber(string dayOfWeek)
+        {
+            return dayOfWeek.ToLower() switch
+            {
+                "sunday" => 0,
+                "monday" => 1,
+                "tuesday" => 2,
+                "wednesday" => 3,
+                "thursday" => 4,
+                "friday" => 5,
+                "saturday" => 6,
+                _ => 0
+            };
         }
     }
 }

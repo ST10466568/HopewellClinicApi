@@ -58,6 +58,7 @@ builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<DoctorScheduleService>();
+builder.Services.AddScoped<IAdminDoctorService, AdminDoctorService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -112,12 +113,25 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();
     });
     
-    // Add a more permissive policy for debugging
+    // Add a more permissive policy for debugging and production
     options.AddPolicy("DebugCors", policy =>
     {
         policy.AllowAnyOrigin()
               .AllowAnyHeader()
               .AllowAnyMethod();
+    });
+    
+    // Production CORS policy
+    options.AddPolicy("ProductionCors", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:3000",
+                "https://hopewell-clinic-frontend.azurewebsites.net",
+                "https://hopewellapi-azcvcferesfpgjgm.southafricanorth-01.azurewebsites.net"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -130,8 +144,41 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Enable CORS first - use DebugCors for now to fix the CORS issue
+// Enable CORS first - use most permissive policy temporarily to fix CORS issue
 app.UseCors("DebugCors");
+
+// Add explicit CORS headers as fallback - ensure they're always set
+app.Use(async (context, next) =>
+{
+    // Always set CORS headers first
+    context.Response.Headers["Access-Control-Allow-Origin"] = "*";
+    context.Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+    context.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+    
+    if (context.Request.Method == "OPTIONS")
+    {
+        context.Response.StatusCode = 200;
+        return;
+    }
+    
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        // Ensure CORS headers are still set even on exceptions
+        context.Response.Headers["Access-Control-Allow-Origin"] = "*";
+        context.Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+        context.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+        
+        // Log the exception for debugging
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Unhandled exception in request pipeline");
+        
+        throw; // Re-throw to let the error handling middleware handle it
+    }
+});
 
 // Add Authentication and Authorization
 app.UseAuthentication();
@@ -167,8 +214,8 @@ try
         // Seed services
         await DbInitializer.SeedServices(db);
         
-        // Seed doctor schedules
-        await DoctorScheduleSeeder.SeedDoctorSchedulesAsync(db);
+        // Seed doctor schedules - temporarily disabled due to foreign key constraint
+        // await DoctorScheduleSeeder.SeedDoctorSchedulesAsync(db);
     }
 }
 catch (Exception ex)

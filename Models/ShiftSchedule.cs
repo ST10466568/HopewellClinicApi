@@ -3,38 +3,29 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HopewellClinicApi.Models
 {
-    public class DoctorSchedule
+    [Table("ShiftSchedules")]
+    public class ShiftSchedule
     {
         [Key]
-        public Guid Id { get; set; }
+        public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
         public Guid DoctorId { get; set; }
 
         [Required]
-        [Column(TypeName = "date")]
-        public DateTime Date { get; set; }
-
-        [Required]
-        [MaxLength(10)]
+        [MaxLength(20)]
         public string DayOfWeek { get; set; } = string.Empty;
 
         [Required]
         [Column(TypeName = "time")]
-        public TimeSpan ShiftStart { get; set; }
+        public TimeSpan StartTime { get; set; }
 
         [Required]
         [Column(TypeName = "time")]
-        public TimeSpan ShiftEnd { get; set; }
+        public TimeSpan EndTime { get; set; }
 
         [Required]
         public bool IsActive { get; set; } = true;
-
-        [Column(TypeName = "time")]
-        public TimeSpan? BreakStart { get; set; }
-
-        [Column(TypeName = "time")]
-        public TimeSpan? BreakEnd { get; set; }
 
         [Required]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -47,3 +38,4 @@ namespace HopewellClinicApi.Models
         public virtual Staff? Doctor { get; set; }
     }
 }
+

@@ -4,21 +4,33 @@ using HopewellClinicApi.Services;
 using HopewellClinicApi.DTOs;
 using HopewellClinicApi.Attributes;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
+using HopewellClinicApi.Models;
 
 namespace HopewellClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [JwtAuthorize]
     public class DoctorScheduleController : ControllerBase
     {
         private readonly DoctorScheduleService _scheduleService;
         private readonly ILogger<DoctorScheduleController> _logger;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public DoctorScheduleController(DoctorScheduleService scheduleService, ILogger<DoctorScheduleController> logger)
+        public DoctorScheduleController(DoctorScheduleService scheduleService, ILogger<DoctorScheduleController> logger, UserManager<ApplicationUser> userManager)
         {
             _scheduleService = scheduleService;
             _logger = logger;
+            _userManager = userManager;
+        }
+
+        /// <summary>
+        /// Test endpoint without any dependencies
+        /// </summary>
+        [HttpGet("test-no-deps")]
+        public ActionResult TestNoDeps()
+        {
+            return Ok(new { message = "No dependencies test works", timestamp = DateTime.UtcNow });
         }
 
         /// <summary>
@@ -62,14 +74,61 @@ namespace HopewellClinicApi.Controllers
         }
 
         /// <summary>
-        /// Update doctor's weekly shift schedule (Frontend compatible)
+        /// Test endpoint for debugging authorization
         /// </summary>
+        [HttpGet("test-auth")]
+        [Authorize]
+        public ActionResult TestAuth()
+        {
+            var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+            var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+            
+            return Ok(new { 
+                userId = currentUserId, 
+                roles = roles,
+                isAuthenticated = User.Identity?.IsAuthenticated,
+                claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList()
+            });
+        }
+
+        /// <summary>
+        /// Simple test endpoint without service dependency
+        /// </summary>
+        [HttpGet("test-simple")]
+        [Authorize]
+        public ActionResult TestSimple()
+        {
+            return Ok(new { message = "Simple test endpoint works", timestamp = DateTime.UtcNow });
+        }
         [HttpPut("{id}/shifts")]
-        [JwtAuthorize]
+        [Authorize]
         public async Task<ActionResult<object>> UpdateDoctorShifts(Guid id, [FromBody] UpdateDoctorShiftsRequest request)
         {
             try
             {
+                // Check authorization - allow admin or doctor accessing their own schedule
+                var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+                if (currentUserId == null || !Guid.TryParse(currentUserId, out var userId))
+                {
+                    return Unauthorized(new { error = "UNAUTHORIZED", message = "Invalid or missing user token" });
+                }
+
+                var user = await _userManager.FindByIdAsync(userId.ToString());
+                if (user == null)
+                {
+                    return Unauthorized(new { error = "UNAUTHORIZED", message = "User not found" });
+                }
+
+                var roles = await _userManager.GetRolesAsync(user);
+                var isAdmin = roles.Contains("Admin");
+                var isDoctor = roles.Contains("Doctor");
+
+                // Check if user is admin or doctor accessing their own schedule
+                if (!isAdmin && (!isDoctor || userId != id))
+                {
+                    return StatusCode(403, new { error = "FORBIDDEN", message = "Insufficient permissions to update this schedule" });
+                }
+
                 var doctor = await _scheduleService.GetDoctorAsync(id);
                 if (doctor == null)
                 {

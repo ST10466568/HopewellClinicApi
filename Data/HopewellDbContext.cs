@@ -18,7 +18,7 @@ namespace HopewellClinicApi.Data
         public DbSet<TimeSlot> TimeSlots { get; set; }
         public DbSet<Appointment> Appointments { get; set; }
         public DbSet<DoctorShift> DoctorShifts { get; set; }
-        public DbSet<DoctorSchedule> DoctorSchedules { get; set; }
+        public DbSet<ShiftSchedule> ShiftSchedules { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -76,31 +76,34 @@ namespace HopewellClinicApi.Data
             modelBuilder.Entity<Appointment>().Property(a => a.AppointmentDate).HasColumnType("date");
             modelBuilder.Entity<Patient>().Property(p => p.DateOfBirth).HasColumnType("date");
             
-            // DoctorSchedule configuration
-            modelBuilder.Entity<DoctorSchedule>()
-                .Property(ds => ds.Date).HasColumnType("date");
-            modelBuilder.Entity<DoctorSchedule>()
-                .Property(ds => ds.DayOfWeek).HasMaxLength(10);
-            modelBuilder.Entity<DoctorSchedule>()
-                .Property(ds => ds.ShiftStart).HasColumnType("time");
-            modelBuilder.Entity<DoctorSchedule>()
-                .Property(ds => ds.ShiftEnd).HasColumnType("time");
-            modelBuilder.Entity<DoctorSchedule>()
-                .Property(ds => ds.BreakStart).HasColumnType("time");
-            modelBuilder.Entity<DoctorSchedule>()
-                .Property(ds => ds.BreakEnd).HasColumnType("time");
+            // ShiftSchedule configuration
+            modelBuilder.Entity<ShiftSchedule>()
+                .Property(ss => ss.DayOfWeek).HasMaxLength(20);
+            modelBuilder.Entity<ShiftSchedule>()
+                .Property(ss => ss.StartTime).HasColumnType("time");
+            modelBuilder.Entity<ShiftSchedule>()
+                .Property(ss => ss.EndTime).HasColumnType("time");
             
             // Unique constraint for DoctorId and DayOfWeek
-            modelBuilder.Entity<DoctorSchedule>()
-                .HasIndex(ds => new { ds.DoctorId, ds.DayOfWeek, ds.Date })
+            modelBuilder.Entity<ShiftSchedule>()
+                .HasIndex(ss => new { ss.DoctorId, ss.DayOfWeek })
                 .IsUnique();
             
-            // DoctorSchedule relationships
-            modelBuilder.Entity<DoctorSchedule>()
-                .HasOne(ds => ds.Doctor)
+            // ShiftSchedule relationships
+            modelBuilder.Entity<ShiftSchedule>()
+                .HasOne(ss => ss.Doctor)
                 .WithMany()
-                .HasForeignKey(ds => ds.DoctorId)
+                .HasForeignKey(ss => ss.DoctorId)
                 .OnDelete(DeleteBehavior.Cascade);
+            
+            // Check constraints
+            modelBuilder.Entity<ShiftSchedule>()
+                .HasCheckConstraint("CK_ShiftSchedules_DayOfWeek", 
+                    "DayOfWeek IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')");
+            
+            modelBuilder.Entity<ShiftSchedule>()
+                .HasCheckConstraint("CK_ShiftSchedules_TimeRange", 
+                    "EndTime > StartTime");
             
             // Decimal precision
             modelBuilder.Entity<Service>().Property(s => s.Price).HasPrecision(10, 2);
@@ -128,7 +131,7 @@ namespace HopewellClinicApi.Data
             var entries = ChangeTracker.Entries()
                 .Where(e => e.Entity is Patient || e.Entity is Staff || e.Entity is Service ||
                             e.Entity is Appointment || e.Entity is TimeSlot || e.Entity is ApplicationUser ||
-                            e.Entity is ApplicationRole || e.Entity is DoctorShift || e.Entity is DoctorSchedule);
+                            e.Entity is ApplicationRole || e.Entity is DoctorShift || e.Entity is ShiftSchedule);
 
             foreach (var entry in entries)
             {

@@ -1286,22 +1286,23 @@ public class AppointmentsController : ControllerBase
         {
             try
             {
+                var dayOfWeek = date.DayOfWeek.ToString();
                 var doctors = await _context.Staff
                     .Include(s => s.User)
                     .Where(s => s.IsActive)
-                    .Join(_context.DoctorSchedules,
+                    .Join(_context.ShiftSchedules,
                         s => s.Id,
                         ds => ds.DoctorId,
                         (s, ds) => new { Staff = s, Schedule = ds })
-                    .Where(x => x.Schedule.Date == date.Date && x.Schedule.IsActive)
+                    .Where(x => x.Schedule.DayOfWeek == dayOfWeek && x.Schedule.IsActive)
                     .Select(x => new
                     {
                         x.Staff.Id,
                         FirstName = x.Staff.User.FirstName,
                         LastName = x.Staff.User.LastName,
                         Specialty = "General Practice",
-                        x.Schedule.ShiftStart,
-                        x.Schedule.ShiftEnd,
+                        x.Schedule.StartTime,
+                        x.Schedule.EndTime,
                         IsAvailable = true
                     })
                     .ToListAsync();

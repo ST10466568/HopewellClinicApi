@@ -62,11 +62,11 @@ namespace HopewellClinicApi.Services
                 var doctorsWithSchedules = await _context.Staff
                     .Include(s => s.User)
                     .Where(s => s.IsActive)
-                    .Join(_context.DoctorSchedules,
+                    .Join(_context.ShiftSchedules,
                         s => s.Id,
                         ds => ds.DoctorId,
                         (s, ds) => new { Staff = s, Schedule = ds })
-                    .Where(x => x.Schedule.DayOfWeek == dayOfWeek && x.Schedule.Date == date.Date && x.Schedule.IsActive)
+                    .Where(x => x.Schedule.DayOfWeek == dayOfWeek && x.Schedule.IsActive)
                     .Select(x => new DoctorOnDutyDto
                     {
                         Id = x.Staff.Id,
@@ -74,8 +74,8 @@ namespace HopewellClinicApi.Services
                         LastName = x.Staff.User.LastName,
                         Specialty = "General Practice",
                         Rating = 4.5,
-                        ShiftStart = x.Schedule.ShiftStart,
-                        ShiftEnd = x.Schedule.ShiftEnd,
+                        ShiftStart = x.Schedule.StartTime,
+                        ShiftEnd = x.Schedule.EndTime,
                         IsAvailable = true,
                         Services = GetDoctorServices(x.Staff.Id)
                     })
@@ -146,14 +146,13 @@ namespace HopewellClinicApi.Services
             try
             {
                 var dayOfWeek = date.DayOfWeek.ToString();
-                var doctorSchedule = await _context.DoctorSchedules
-                    .FirstOrDefaultAsync(ds => ds.DoctorId == doctorId && ds.DayOfWeek == dayOfWeek && ds.Date == date.Date && ds.IsActive);
+                var doctorSchedule = await _context.ShiftSchedules
+                    .FirstOrDefaultAsync(ds => ds.DoctorId == doctorId && ds.DayOfWeek == dayOfWeek && ds.IsActive);
 
                 // If no specific schedule found, use default working hours
-                var shiftStart = doctorSchedule?.ShiftStart ?? new TimeSpan(9, 0, 0); // Default 9 AM
-                var shiftEnd = doctorSchedule?.ShiftEnd ?? new TimeSpan(17, 0, 0); // Default 5 PM
-                var breakStart = doctorSchedule?.BreakStart;
-                var breakEnd = doctorSchedule?.BreakEnd;
+                var shiftStart = doctorSchedule?.StartTime ?? new TimeSpan(9, 0, 0); // Default 9 AM
+                var shiftEnd = doctorSchedule?.EndTime ?? new TimeSpan(17, 0, 0); // Default 5 PM
+                var breakEnd = (TimeSpan?)null; // ShiftSchedule doesn't have break times
 
                 // Get service duration (default 30 minutes)
                 var serviceDuration = 30;
@@ -197,14 +196,8 @@ namespace HopewellClinicApi.Services
                         }
                     }
 
-                    // Check if slot is during break time (only if not already unavailable due to appointment)
-                    if (isAvailable && breakStart.HasValue && breakEnd.HasValue)
-                    {
-                        if (currentTime < breakEnd.Value && endTime > breakStart.Value)
-                        {
-                            isAvailable = false;
-                        }
-                    }
+                    // Check if slot is during break time (no break times in ShiftSchedule)
+                    // Skip break time check since ShiftSchedule doesn't have break times
 
                     slots.Add(new TimeSlotDto
                     {
@@ -261,10 +254,9 @@ namespace HopewellClinicApi.Services
                 foreach (var staff in doctors)
                 {
                     // Check if this staff member has a schedule for the given date
-                    var schedule = await _context.DoctorSchedules
+                    var schedule = await _context.ShiftSchedules
                         .FirstOrDefaultAsync(ds => ds.DoctorId == staff.Id && 
                                                   ds.DayOfWeek == dayOfWeek && 
-                                                  ds.Date == date.Date && 
                                                   ds.IsActive);
 
                     if (schedule != null)
@@ -276,8 +268,8 @@ namespace HopewellClinicApi.Services
                             LastName = staff.User?.LastName ?? "Unknown",
                             Role = "doctor",
                             Specialty = "General",
-                            ShiftStart = schedule.ShiftStart,
-                            ShiftEnd = schedule.ShiftEnd,
+                        ShiftStart = schedule.StartTime,
+                        ShiftEnd = schedule.EndTime,
                             IsAvailable = true
                         });
                     }
@@ -298,10 +290,9 @@ namespace HopewellClinicApi.Services
         {
             // Validate doctor is on duty
             var dayOfWeek = request.Date.DayOfWeek.ToString();
-            var doctorSchedule = await _context.DoctorSchedules
+            var doctorSchedule = await _context.ShiftSchedules
                 .FirstOrDefaultAsync(ds => ds.DoctorId == request.DoctorId && 
                                          ds.DayOfWeek == dayOfWeek &&
-                                         ds.Date == request.Date.Date && 
                                          ds.IsActive);
 
             if (doctorSchedule == null)
@@ -310,7 +301,7 @@ namespace HopewellClinicApi.Services
             }
 
             // Validate time slot is within doctor's shift
-            if (request.StartTime < doctorSchedule.ShiftStart || request.EndTime > doctorSchedule.ShiftEnd)
+            if (request.StartTime < doctorSchedule.StartTime || request.EndTime > doctorSchedule.EndTime)
             {
                 throw new InvalidOperationException("INVALID_APPOINTMENT_TIME");
             }

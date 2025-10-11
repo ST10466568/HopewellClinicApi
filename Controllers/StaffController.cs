@@ -50,7 +50,7 @@ public class StaffController : ControllerBase
                 }
 
                 // Get doctor schedules for this staff member
-                var schedules = await _context.DoctorSchedules
+                var schedules = await _context.ShiftSchedules
                     .Where(ds => ds.DoctorId == staffGuid && ds.IsActive)
                     .OrderBy(ds => ds.DayOfWeek)
                     .ToListAsync();
@@ -72,10 +72,10 @@ public class StaffController : ControllerBase
                     {
                         dayOfWeek = s.DayOfWeek,
                         isActive = s.IsActive,
-                        startTime = s.ShiftStart.ToString(@"hh\:mm"),
-                        endTime = s.ShiftEnd.ToString(@"hh\:mm"),
-                        breakStart = s.BreakStart?.ToString(@"hh\:mm"),
-                        breakEnd = s.BreakEnd?.ToString(@"hh\:mm")
+                        startTime = s.StartTime.ToString(@"hh\:mm"),
+                        endTime = s.EndTime.ToString(@"hh\:mm"),
+                        breakStart = (string?)null,
+                        breakEnd = (string?)null
                     }).ToList()
                     : defaultSchedule.Select(ds => new
                     {
@@ -183,7 +183,7 @@ public class StaffController : ControllerBase
                 }
 
                 // Get doctor schedules for this staff member
-                var schedules = await _context.DoctorSchedules
+                var schedules = await _context.ShiftSchedules
                     .Where(ds => ds.DoctorId == staffGuid && ds.IsActive)
                     .OrderBy(ds => ds.DayOfWeek)
                     .ToListAsync();
@@ -205,10 +205,10 @@ public class StaffController : ControllerBase
                     {
                         dayOfWeek = s.DayOfWeek,
                         isActive = s.IsActive,
-                        startTime = s.ShiftStart.ToString(@"hh\:mm"),
-                        endTime = s.ShiftEnd.ToString(@"hh\:mm"),
-                        breakStart = s.BreakStart?.ToString(@"hh\:mm"),
-                        breakEnd = s.BreakEnd?.ToString(@"hh\:mm")
+                        startTime = s.StartTime.ToString(@"hh\:mm"),
+                        endTime = s.EndTime.ToString(@"hh\:mm"),
+                        breakStart = (string?)null,
+                        breakEnd = (string?)null
                     }).ToList()
                     : defaultSchedule.Select(ds => new
                     {
@@ -609,11 +609,11 @@ public class StaffController : ControllerBase
 
                 var staff = await query
                     .Include(s => s.User)
-                    .Join(_context.DoctorSchedules,
+                    .Join(_context.ShiftSchedules,
                         s => s.Id,
                         ds => ds.DoctorId,
                         (s, ds) => new { Staff = s, Schedule = ds })
-                    .Where(x => x.Schedule.DayOfWeek == date.DayOfWeek.ToString() && x.Schedule.Date == date.Date && x.Schedule.IsActive)
+                    .Where(x => x.Schedule.DayOfWeek == date.DayOfWeek.ToString() && x.Schedule.IsActive)
                     .Select(x => new
                     {
                         x.Staff.Id,
@@ -621,8 +621,8 @@ public class StaffController : ControllerBase
                         LastName = x.Staff.User.LastName,
                         Role = "doctor",
                         Specialty = "General Practice",
-                        x.Schedule.ShiftStart,
-                        x.Schedule.ShiftEnd,
+                        x.Schedule.StartTime,
+                        x.Schedule.EndTime,
                         IsAvailable = true
                     })
                     .ToListAsync();
@@ -658,32 +658,31 @@ public class StaffController : ControllerBase
                     return NotFound(new { error = "Staff member not found" });
                 }
 
-                var query = _context.DoctorSchedules
+                var query = _context.ShiftSchedules
                     .Where(ds => ds.DoctorId == id);
 
                 if (startDate.HasValue)
                 {
-                    query = query.Where(ds => ds.Date >= startDate.Value.Date);
+                    // ShiftSchedule doesn't have date filtering, skip this condition
                 }
 
                 if (endDate.HasValue)
                 {
-                    query = query.Where(ds => ds.Date <= endDate.Value.Date);
+                    // ShiftSchedule doesn't have date filtering, skip this condition
                 }
 
                 var schedules = await query
                     .OrderBy(ds => ds.DayOfWeek)
-                    .ThenBy(ds => ds.Date)
                     .Select(ds => new
                     {
                         ds.Id,
                         ds.DoctorId,
                         ds.DayOfWeek,
                         ds.IsActive,
-                        ShiftStart = ds.ShiftStart.ToString(@"hh\:mm"),
-                        ShiftEnd = ds.ShiftEnd.ToString(@"hh\:mm"),
-                        BreakStart = ds.BreakStart.HasValue ? ds.BreakStart.Value.ToString(@"hh\:mm") : null,
-                        BreakEnd = ds.BreakEnd.HasValue ? ds.BreakEnd.Value.ToString(@"hh\:mm") : null,
+                        ShiftStart = ds.StartTime.ToString(@"hh\:mm"),
+                        ShiftEnd = ds.EndTime.ToString(@"hh\:mm"),
+                        BreakStart = (string?)null, // ShiftSchedule doesn't have break times
+                        BreakEnd = (string?)null,
                         ds.CreatedAt,
                         ds.UpdatedAt
                     })

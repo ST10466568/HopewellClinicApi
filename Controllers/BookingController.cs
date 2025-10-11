@@ -263,7 +263,7 @@ namespace HopewellClinicApi.Controllers
                     DatabaseConnection = "Connected",
                     StaffCount = await _context.Staff.CountAsync(),
                     ActiveStaffCount = await _context.Staff.Where(s => s.IsActive).CountAsync(),
-                    DoctorSchedulesCount = await _context.DoctorSchedules.CountAsync(),
+                    DoctorSchedulesCount = await _context.ShiftSchedules.CountAsync(),
                     AppointmentsCount = await _context.Appointments.CountAsync(),
                     ServicesCount = await _context.Services.CountAsync(),
                     StaffWithUsers = await _context.Staff.Include(s => s.User).Where(s => s.User != null).CountAsync(),
