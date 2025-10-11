@@ -59,6 +59,8 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<DoctorScheduleService>();
 builder.Services.AddScoped<IAdminDoctorService, AdminDoctorService>();
+builder.Services.AddScoped<IAppointmentManagementService, AppointmentManagementService>();
+builder.Services.AddLogging();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -81,7 +83,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ClockSkew = TimeSpan.Zero
         };
         
-        // Remove all events to eliminate potential issues
+        // Add event handlers for debugging
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"JWT Authentication Failed: {context.Exception.Message}");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine($"JWT Token Validated Successfully for user: {context.Principal?.Identity?.Name}");
+                return Task.CompletedTask;
+            },
+            OnMessageReceived = context =>
+            {
+                Console.WriteLine($"JWT Message Received: {context.Request.Path}");
+                return Task.CompletedTask;
+            }
+        };
     });
 
 // Add Authorization
@@ -144,45 +164,35 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Enable CORS first - use most permissive policy temporarily to fix CORS issue
-app.UseCors("DebugCors");
-
-// Add explicit CORS headers as fallback - ensure they're always set
+// Add comprehensive middleware logging
 app.Use(async (context, next) =>
 {
-    // Always set CORS headers first
-    context.Response.Headers["Access-Control-Allow-Origin"] = "*";
-    context.Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
-    context.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+    Console.WriteLine($"MIDDLEWARE: Request started - {context.Request.Method} {context.Request.Path}");
+    Console.WriteLine($"MIDDLEWARE: Headers - Authorization: {context.Request.Headers["Authorization"].FirstOrDefault()}");
     
-    if (context.Request.Method == "OPTIONS")
-    {
-        context.Response.StatusCode = 200;
-        return;
-    }
+    await next();
     
-    try
-    {
-        await next();
-    }
-    catch (Exception ex)
-    {
-        // Ensure CORS headers are still set even on exceptions
-        context.Response.Headers["Access-Control-Allow-Origin"] = "*";
-        context.Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
-        context.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
-        
-        // Log the exception for debugging
-        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Unhandled exception in request pipeline");
-        
-        throw; // Re-throw to let the error handling middleware handle it
-    }
+    Console.WriteLine($"MIDDLEWARE: Request completed - Status: {context.Response.StatusCode}");
 });
 
-// Add Authentication and Authorization
+// Enable CORS first - use most permissive policy to fix CORS issue
+app.UseCors("DebugCors");
+
+// Add Authentication and Authorization FIRST
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Add authentication debugging middleware
+app.Use(async (context, next) =>
+{
+    Console.WriteLine($"AUTH MIDDLEWARE: User authenticated: {context.User.Identity?.IsAuthenticated}");
+    Console.WriteLine($"AUTH MIDDLEWARE: User name: {context.User.Identity?.Name}");
+    Console.WriteLine($"AUTH MIDDLEWARE: User claims count: {context.User.Claims.Count()}");
+    
+    await next();
+});
+
+// CORS is handled by app.UseCors("DebugCors") above
 
 // Add routing
 app.UseRouting();

@@ -6,6 +6,7 @@ using HopewellClinicApi.Models;
 using HopewellClinicApi.DTOs;
 using HopewellClinicApi.Attributes;
 using HopewellClinicApi.Services;
+using System.Security.Claims;
 
 namespace HopewellClinicApi.Controllers
 {
@@ -14,10 +15,187 @@ namespace HopewellClinicApi.Controllers
 public class AppointmentsController : ControllerBase
     {
         private readonly HopewellDbContext _context;
+        private readonly IAppointmentManagementService _appointmentManagementService;
 
-        public AppointmentsController(HopewellDbContext context)
+        public AppointmentsController(HopewellDbContext context, IAppointmentManagementService appointmentManagementService)
         {
             _context = context;
+            _appointmentManagementService = appointmentManagementService;
+        }
+
+        /// <summary>
+        /// Create a test appointment for testing purposes
+        /// </summary>
+        /// <summary>
+        /// Minimal test endpoint to isolate the 500 error issue
+        /// </summary>
+        [HttpPut("test-minimal-update/{id}")]
+        [JwtAuthorize]
+        public async Task<ActionResult> TestMinimalUpdate(Guid id, [FromBody] object request)
+        {
+            try
+            {
+                return Ok(new { 
+                    success = true, 
+                    message = "Minimal test successful",
+                    id = id,
+                    requestType = request?.GetType().Name ?? "null",
+                    userAuthenticated = User.Identity?.IsAuthenticated ?? false,
+                    userId = User.FindFirst("sub")?.Value ?? "not found"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    error = "Minimal test failed", 
+                    message = ex.Message,
+                    stackTrace = ex.StackTrace
+                });
+            }
+        }
+
+        [HttpPost("test/create")]
+        [AllowAnonymous]
+        public async Task<ActionResult<object>> CreateTestAppointment()
+        {
+            try
+            {
+                // Get first available service
+                var service = await _context.Services.FirstOrDefaultAsync();
+                if (service == null)
+                {
+                    return BadRequest(new { error = "No services available" });
+                }
+
+                // Get first available patient
+                var patient = await _context.Patients.FirstOrDefaultAsync();
+                if (patient == null)
+                {
+                    return BadRequest(new { error = "No patients available" });
+                }
+
+                // Create test appointment
+                var testAppointment = new Appointment
+                {
+                    Id = Guid.NewGuid(),
+                    AppointmentDate = DateTime.UtcNow.AddDays(1),
+                    StartTime = new TimeOnly(10, 0),
+                    EndTime = new TimeOnly(11, 0),
+                    Status = "Scheduled",
+                    Notes = "Test appointment for API testing",
+                    ServiceId = service.Id,
+                    PatientId = patient.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                _context.Appointments.Add(testAppointment);
+                await _context.SaveChangesAsync();
+
+                return Ok(new {
+                    success = true,
+                    message = "Test appointment created successfully",
+                    appointmentId = testAppointment.Id,
+                    appointmentDate = testAppointment.AppointmentDate,
+                    startTime = testAppointment.StartTime,
+                    endTime = testAppointment.EndTime,
+                    status = testAppointment.Status,
+                    serviceName = service.Name,
+                    patientName = $"{patient.User.FirstName} {patient.User.LastName}"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    error = "Failed to create test appointment", 
+                    message = ex.Message,
+                    stackTrace = ex.StackTrace
+                });
+            }
+        }
+
+        /// <summary>
+        /// Simple database test endpoint
+        /// </summary>
+        [HttpGet("test/database")]
+        [AllowAnonymous]
+        public async Task<ActionResult<object>> TestDatabase()
+        {
+            try
+            {
+                // Test basic database connection
+                var appointmentCount = await _context.Appointments.CountAsync();
+                var serviceCount = await _context.Services.CountAsync();
+                var patientCount = await _context.Patients.CountAsync();
+                
+                // Test if we can find any appointment
+                var firstAppointment = await _context.Appointments.FirstOrDefaultAsync();
+                
+                return Ok(new {
+                    message = "Database test successful",
+                    timestamp = DateTime.UtcNow,
+                    appointmentCount = appointmentCount,
+                    serviceCount = serviceCount,
+                    patientCount = patientCount,
+                    firstAppointmentId = firstAppointment?.Id,
+                    firstAppointmentDate = firstAppointment?.AppointmentDate
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    error = "Database test failed", 
+                    message = ex.Message, 
+                    stackTrace = ex.StackTrace,
+                    innerException = ex.InnerException?.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Simple test endpoint to check service availability
+        /// </summary>
+        [HttpGet("test/service")]
+        [AllowAnonymous]
+        public async Task<ActionResult<object>> TestService()
+        {
+            try
+            {
+                // Test if service is injected
+                var serviceAvailable = _appointmentManagementService != null;
+                
+                // Test database connection
+                var appointmentCount = await _context.Appointments.CountAsync();
+                
+                // Test service method with minimal data
+                var testResult = await _appointmentManagementService.ValidateAppointmentUpdateAsync(
+                    Guid.NewGuid(), 
+                    new AdminUpdateAppointmentRequest 
+                    { 
+                        AppointmentDate = DateTime.UtcNow.AddDays(1),
+                        StartTime = "10:00",
+                        EndTime = "11:00",
+                        Status = "Confirmed",
+                        ServiceId = Guid.NewGuid()
+                    });
+
+                return Ok(new {
+                    message = "Service test successful",
+                    timestamp = DateTime.UtcNow,
+                    serviceAvailable = serviceAvailable,
+                    appointmentCount = appointmentCount,
+                    validationTest = testResult.IsValid ? "Service working" : $"Service validation failed: {string.Join(", ", testResult.Errors)}"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    error = "Service test failed", 
+                    message = ex.Message, 
+                    stackTrace = ex.StackTrace,
+                    innerException = ex.InnerException?.Message
+                });
+            }
         }
 
         /// <summary>
@@ -435,7 +613,7 @@ public class AppointmentsController : ControllerBase
             }
         }
 
-        [HttpGet]
+        [HttpGet("list")]
         [JwtAuthorize]
         public async Task<ActionResult<IEnumerable<AppointmentResponse>>> GetAppointments()
         {
@@ -491,7 +669,7 @@ public class AppointmentsController : ControllerBase
             }
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("get/{id}")]
         public async Task<ActionResult<AppointmentResponse>> GetAppointment(Guid id)
         {
             try
@@ -552,7 +730,71 @@ public class AppointmentsController : ControllerBase
             }
         }
 
-        [HttpPut("{id}")]
+        /// <summary>
+        /// Get all appointments - FRONTEND COMPATIBLE ENDPOINT
+        /// This is the route the frontend expects: GET /api/Appointments
+        /// </summary>
+        [HttpGet]
+        [JwtAuthorize]
+        public async Task<ActionResult<IEnumerable<AppointmentResponse>>> GetAppointmentsFrontendCompatible()
+        {
+            try
+            {
+                Console.WriteLine($"GET /api/Appointments - Starting method execution (Frontend Compatible)");
+                
+                var appointments = await _context.Appointments
+                    .Include(a => a.Service)
+                    .Include(a => a.Patient)
+                        .ThenInclude(p => p.User)
+                    .Include(a => a.Staff)
+                        .ThenInclude(s => s.User)
+                    .Select(a => new AppointmentResponse
+                    {
+                        Id = a.Id,
+                        AppointmentDate = a.AppointmentDate,
+                        StartTime = a.StartTime,
+                        EndTime = a.EndTime,
+                        Status = a.Status,
+                        Notes = a.Notes,
+                        Service = new ServiceResponse
+                        {
+                            Id = a.Service.Id,
+                            Name = a.Service.Name,
+                            Description = a.Service.Description,
+                            DurationMinutes = a.Service.DurationMinutes
+                        },
+                        Patient = a.Patient != null ? new PatientResponse
+                        {
+                            Id = a.Patient.Id,
+                            FirstName = a.Patient.User.FirstName,
+                            LastName = a.Patient.User.LastName,
+                            Phone = a.Patient.User.PhoneNumber ?? ""
+                        } : null,
+                        Staff = a.Staff != null ? new StaffResponse
+                        {
+                            Id = a.Staff.Id,
+                            UserId = a.Staff.UserId,
+                            StaffNumber = a.Staff.StaffNumber,
+                            FirstName = a.Staff.User.FirstName,
+                            LastName = a.Staff.User.LastName,
+                            Role = "staff",
+                            Phone = a.Staff.User.PhoneNumber,
+                            IsActive = a.Staff.User.IsActive
+                        } : null
+                    })
+                    .ToListAsync();
+
+                Console.WriteLine($"GET /api/Appointments - Found {appointments.Count} appointments");
+                return Ok(appointments);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"GET /api/Appointments Error: {ex.Message}");
+                return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+            }
+        }
+
+        [HttpPut("admin/update/{id}")]
         public async Task<ActionResult<AppointmentResponse>> UpdateAppointment(Guid id, [FromBody] UpdateAppointmentRequest request)
         {
             try
@@ -1317,6 +1559,514 @@ public class AppointmentsController : ControllerBase
             catch (Exception ex)
             {
                 return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Update an existing appointment (Admin only) - Backward compatible endpoint
+        /// </summary>
+        [HttpPut("admin/appointment/{id}")]
+        [Authorize]
+        public async Task<ActionResult<AppointmentOperationResponse>> UpdateAppointment(Guid id, [FromBody] AdminUpdateAppointmentRequest request)
+        {
+            try
+            {
+                // Get current user ID for audit logging
+                var currentUserId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (currentUserId == null || !Guid.TryParse(currentUserId, out var adminId))
+                {
+                    return Unauthorized(new AppointmentOperationResponse
+                    {
+                        Success = false,
+                        Error = "Unauthorized access"
+                    });
+                }
+
+                // Validate the request
+                var validationResult = await _appointmentManagementService.ValidateAppointmentUpdateAsync(id, request);
+                if (!validationResult.IsValid)
+                {
+                    return BadRequest(new AppointmentOperationResponse
+                    {
+                        Success = false,
+                        Error = string.Join(", ", validationResult.Errors)
+                    });
+                }
+
+                // Update the appointment
+                var result = await _appointmentManagementService.UpdateAppointmentAsync(id, request, adminId);
+                
+                if (!result.Success)
+                {
+                    return result.Error == "Appointment not found" 
+                        ? NotFound(result) 
+                        : StatusCode(500, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new AppointmentOperationResponse
+                {
+                    Success = false,
+                    Error = "Internal server error"
+                });
+            }
+        }
+
+        /// <summary>
+        /// Update an existing appointment (Admin only) - New admin endpoint
+        /// </summary>
+        [HttpPut("admin/{id}")]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<AppointmentOperationResponse>> AdminUpdateAppointment(Guid id, [FromBody] AdminUpdateAppointmentRequest request)
+        {
+            try
+            {
+                // Get current user ID for audit logging
+                var currentUserId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (currentUserId == null || !Guid.TryParse(currentUserId, out var adminId))
+                {
+                    return Unauthorized(new AppointmentOperationResponse
+                    {
+                        Success = false,
+                        Error = "Unauthorized access"
+                    });
+                }
+
+                // Validate the request
+                var validationResult = await _appointmentManagementService.ValidateAppointmentUpdateAsync(id, request);
+                if (!validationResult.IsValid)
+                {
+                    return BadRequest(new AppointmentOperationResponse
+                    {
+                        Success = false,
+                        Error = string.Join(", ", validationResult.Errors)
+                    });
+                }
+
+                // Update the appointment
+                var result = await _appointmentManagementService.UpdateAppointmentAsync(id, request, adminId);
+                
+                if (!result.Success)
+                {
+                    return result.Error == "Appointment not found" 
+                        ? NotFound(result) 
+                        : StatusCode(500, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new AppointmentOperationResponse
+                {
+                    Success = false,
+                    Error = "Internal server error"
+                });
+            }
+        }
+
+        /// <summary>
+        /// Delete an appointment (Admin only)
+        /// </summary>
+        [HttpDelete("admin/{id}")]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<AppointmentOperationResponse>> AdminDeleteAppointment(Guid id)
+        {
+            try
+            {
+                // Get current user ID for audit logging
+                var currentUserId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (currentUserId == null || !Guid.TryParse(currentUserId, out var adminId))
+                {
+                    return Unauthorized(new AppointmentOperationResponse
+                    {
+                        Success = false,
+                        Error = "Unauthorized access"
+                    });
+                }
+
+                // Delete the appointment
+                var result = await _appointmentManagementService.DeleteAppointmentAsync(id, adminId);
+                
+                if (!result.Success)
+                {
+                    return result.Error == "Appointment not found" 
+                        ? NotFound(result) 
+                        : StatusCode(500, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new AppointmentOperationResponse
+                {
+                    Success = false,
+                    Error = "Internal server error"
+                });
+            }
+        }
+        
+        /// <summary>
+        /// Get appointments with search and pagination (Admin only) - Backward compatible endpoint
+        /// </summary>
+        [HttpGet("admin/search")]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<PagedAppointmentsResponse>> GetAppointments(
+            [FromQuery] string? search = null,
+            [FromQuery] string? status = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int limit = 10,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null,
+            [FromQuery] Guid? doctorId = null,
+            [FromQuery] Guid? serviceId = null)
+        {
+            try
+            {
+                var request = new AppointmentSearchRequest
+                {
+                    Search = search,
+                    Status = status,
+                    Page = page,
+                    Limit = Math.Min(limit, 100), // Cap at 100 items per page
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    DoctorId = doctorId,
+                    ServiceId = serviceId
+                };
+
+                var result = await _appointmentManagementService.GetAppointmentsWithPaginationAsync(request);
+                
+                if (!result.Success)
+                {
+                    return StatusCode(500, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new PagedAppointmentsResponse
+                {
+                    Success = false,
+                    Error = "Internal server error"
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get appointments with search and pagination (Admin only) - New admin endpoint
+        /// </summary>
+        [HttpGet("admin/list")]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<PagedAppointmentsResponse>> AdminGetAppointments(
+            [FromQuery] string? search = null,
+            [FromQuery] string? status = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int limit = 10,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null,
+            [FromQuery] Guid? doctorId = null,
+            [FromQuery] Guid? serviceId = null)
+        {
+            try
+            {
+                var request = new AppointmentSearchRequest
+                {
+                    Search = search,
+                    Status = status,
+                    Page = page,
+                    Limit = Math.Min(limit, 100), // Cap at 100 items per page
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    DoctorId = doctorId,
+                    ServiceId = serviceId
+                };
+
+                var result = await _appointmentManagementService.GetAppointmentsWithPaginationAsync(request);
+                
+                if (!result.Success)
+                {
+                    return StatusCode(500, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new PagedAppointmentsResponse
+                {
+                    Success = false,
+                    Error = "Internal server error"
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get appointment by ID (Admin only)
+        /// </summary>
+        [HttpGet("admin/appointment/{id}")]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<AppointmentDetailDto>> AdminGetAppointmentById(Guid id)
+        {
+            try
+            {
+                var appointment = await _appointmentManagementService.GetAppointmentByIdAsync(id);
+                
+                if (appointment == null)
+                {
+                    return NotFound(new { error = "Appointment not found" });
+                }
+
+                return Ok(appointment);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    error = "Internal server error", 
+                    message = ex.Message,
+                    stackTrace = ex.StackTrace,
+                    innerException = ex.InnerException?.Message,
+                    appointmentId = id
+                });
+            }
+        }
+
+        /// <summary>
+        /// Update appointment (Admin only) - BACKWARD COMPATIBLE ENDPOINT
+        /// Uses specific route to avoid conflicts with other PUT routes
+        /// </summary>
+        [HttpPut("update/{id}")]
+        [JwtAuthorize]
+        public async Task<ActionResult> UpdateAppointmentBackwardCompatible(Guid id, [FromBody] UpdateAppointmentRequest request)
+        {
+            try
+            {
+                Console.WriteLine($"PUT /api/Appointments/update/{id} - Starting method execution");
+                
+                // Step 1: Validate JWT token
+                var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                Console.WriteLine($"User ID Claim: {userIdClaim}");
+                
+                if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                {
+                    Console.WriteLine($"Invalid user token: {userIdClaim}");
+                    return Unauthorized(new { error = "Invalid user token", userIdClaim = userIdClaim });
+                }
+
+                // Step 2: Validate request
+                if (request == null)
+                {
+                    Console.WriteLine("Request body is null");
+                    return BadRequest(new { error = "Request body is null" });
+                }
+
+                Console.WriteLine($"Request received: Status={request.Status}");
+
+                // Step 3: Check if appointment exists
+                Console.WriteLine($"Looking for appointment with ID: {id}");
+                var existingAppointment = await _context.Appointments.FindAsync(id);
+                if (existingAppointment == null)
+                {
+                    Console.WriteLine($"Appointment not found: {id}");
+                    return NotFound(new { error = "Appointment not found", appointmentId = id });
+                }
+
+                Console.WriteLine($"Found appointment: {existingAppointment.Id}, Status: {existingAppointment.Status}");
+
+                // Step 4: Test database connection
+                var appointmentCount = await _context.Appointments.CountAsync();
+                Console.WriteLine($"Database connection test successful. Total appointments: {appointmentCount}");
+                
+                // Step 5: Update only Status field for minimal testing
+                var originalStatus = existingAppointment.Status;
+                existingAppointment.Status = request.Status ?? existingAppointment.Status;
+                existingAppointment.UpdatedAt = DateTime.UtcNow;
+
+                Console.WriteLine($"Updating status from '{originalStatus}' to '{existingAppointment.Status}'");
+
+                // Step 6: Save changes
+                await _context.SaveChangesAsync();
+                Console.WriteLine("Changes saved successfully");
+
+                return Ok(new { 
+                    success = true, 
+                    message = "Appointment updated successfully", 
+                    id = id,
+                    appointmentCount = appointmentCount,
+                    originalStatus = originalStatus,
+                    newStatus = existingAppointment.Status,
+                    requestStatus = request.Status
+                });
+            }
+            catch (Exception ex)
+            {
+                // Comprehensive exception logging
+                Console.WriteLine($"PUT /api/Appointments/update/{id} Error: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                    Console.WriteLine($"Inner Stack Trace: {ex.InnerException.StackTrace}");
+                }
+
+                var errorDetails = new
+                {
+                    error = "Internal server error",
+                    message = ex.Message,
+                    stackTrace = ex.StackTrace,
+                    innerException = ex.InnerException?.Message,
+                    innerStackTrace = ex.InnerException?.StackTrace,
+                    appointmentId = id,
+                    requestBody = request?.Status ?? "null",
+                    userId = User.FindFirst("sub")?.Value ?? "not found",
+                    timestamp = DateTime.UtcNow,
+                    exceptionType = ex.GetType().Name
+                };
+
+                return StatusCode(500, errorDetails);
+            }
+        }
+
+        /// <summary>
+        /// Update appointment - FRONTEND COMPATIBLE ENDPOINT
+        /// This is the route the frontend expects: PUT /api/Appointments/{id}
+        /// </summary>
+        [HttpPut("{id}")]
+        [JwtAuthorize]
+        public async Task<ActionResult> UpdateAppointmentFrontendCompatible(Guid id, [FromBody] UpdateAppointmentRequest request)
+        {
+            try
+            {
+                Console.WriteLine($"PUT /api/Appointments/{id} - Starting method execution (Frontend Compatible)");
+                
+                // Step 1: Validate JWT token
+                var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                Console.WriteLine($"User ID Claim: {userIdClaim}");
+                
+                if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                {
+                    Console.WriteLine($"Invalid user token: {userIdClaim}");
+                    return Unauthorized(new { error = "Invalid user token", userIdClaim = userIdClaim });
+                }
+
+                // Step 2: Validate request
+                if (request == null)
+                {
+                    Console.WriteLine("Request body is null");
+                    return BadRequest(new { error = "Request body is null" });
+                }
+
+                Console.WriteLine($"Request received: AppointmentDate={request.AppointmentDate}, StartTime={request.StartTime}, EndTime={request.EndTime}, Notes={request.Notes}, Status={request.Status}");
+
+                // Step 3: Check if appointment exists
+                Console.WriteLine($"Looking for appointment with ID: {id}");
+                var existingAppointment = await _context.Appointments.FindAsync(id);
+                if (existingAppointment == null)
+                {
+                    Console.WriteLine($"Appointment not found: {id}");
+                    return NotFound(new { error = "Appointment not found", appointmentId = id });
+                }
+
+                Console.WriteLine($"Found appointment: {existingAppointment.Id}, Status: {existingAppointment.Status}");
+
+                // Step 4: Test database connection
+                var appointmentCount = await _context.Appointments.CountAsync();
+                Console.WriteLine($"Database connection test successful. Total appointments: {appointmentCount}");
+                
+                // Step 5: Update all fields from request
+                var originalValues = new
+                {
+                    AppointmentDate = existingAppointment.AppointmentDate,
+                    StartTime = existingAppointment.StartTime,
+                    EndTime = existingAppointment.EndTime,
+                    Notes = existingAppointment.Notes,
+                    Status = existingAppointment.Status
+                };
+
+                // Update fields only if they are provided in the request
+                if (request.AppointmentDate.HasValue)
+                {
+                    existingAppointment.AppointmentDate = request.AppointmentDate.Value;
+                    Console.WriteLine($"Updated AppointmentDate from '{originalValues.AppointmentDate}' to '{existingAppointment.AppointmentDate}'");
+                }
+
+                if (request.StartTime.HasValue)
+                {
+                    existingAppointment.StartTime = request.StartTime.Value;
+                    Console.WriteLine($"Updated StartTime from '{originalValues.StartTime}' to '{existingAppointment.StartTime}'");
+                }
+
+                if (request.EndTime.HasValue)
+                {
+                    existingAppointment.EndTime = request.EndTime.Value;
+                    Console.WriteLine($"Updated EndTime from '{originalValues.EndTime}' to '{existingAppointment.EndTime}'");
+                }
+
+                if (request.Notes != null)
+                {
+                    existingAppointment.Notes = request.Notes;
+                    Console.WriteLine($"Updated Notes from '{originalValues.Notes}' to '{existingAppointment.Notes}'");
+                }
+
+                if (request.Status != null)
+                {
+                    existingAppointment.Status = request.Status;
+                    Console.WriteLine($"Updated Status from '{originalValues.Status}' to '{existingAppointment.Status}'");
+                }
+
+                existingAppointment.UpdatedAt = DateTime.UtcNow;
+
+                // Step 6: Save changes
+                await _context.SaveChangesAsync();
+                Console.WriteLine("Changes saved successfully");
+
+                return Ok(new { 
+                    success = true, 
+                    message = "Appointment updated successfully", 
+                    id = id,
+                    appointmentCount = appointmentCount,
+                    originalValues = originalValues,
+                    updatedValues = new
+                    {
+                        AppointmentDate = existingAppointment.AppointmentDate,
+                        StartTime = existingAppointment.StartTime,
+                        EndTime = existingAppointment.EndTime,
+                        Notes = existingAppointment.Notes,
+                        Status = existingAppointment.Status
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                // Comprehensive exception logging
+                Console.WriteLine($"PUT /api/Appointments/{id} Error: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                    Console.WriteLine($"Inner Stack Trace: {ex.InnerException.StackTrace}");
+                }
+
+                var errorDetails = new
+                {
+                    error = "Internal server error",
+                    message = ex.Message,
+                    stackTrace = ex.StackTrace,
+                    innerException = ex.InnerException?.Message,
+                    innerStackTrace = ex.InnerException?.StackTrace,
+                    appointmentId = id,
+                    requestBody = request?.Status ?? "null",
+                    userId = User.FindFirst("sub")?.Value ?? "not found",
+                    timestamp = DateTime.UtcNow,
+                    exceptionType = ex.GetType().Name
+                };
+
+                return StatusCode(500, errorDetails);
             }
         }
     }
