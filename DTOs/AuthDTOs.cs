@@ -78,6 +78,10 @@ namespace HopewellClinicApi.DTOs
         public string LastName { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public string? Phone { get; set; }
+        public string? DateOfBirth { get; set; } // YYYY-MM-DD format
+        public string? Address { get; set; }
+        public string? EmergencyContact { get; set; }
+        public string? EmergencyPhone { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }

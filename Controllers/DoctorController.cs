@@ -23,6 +23,17 @@ namespace HopewellClinicApi.Controllers
         }
 
         /// <summary>
+        /// Redirect to the correct shift schedule endpoint
+        /// </summary>
+        [HttpGet("{doctorId}/shifts")]
+        [AllowAnonymous]
+        public IActionResult GetDoctorShiftsRedirect(Guid doctorId)
+        {
+            // Redirect to the correct endpoint in BookingController
+            return Redirect($"/api/Booking/doctor/{doctorId}/shifts");
+        }
+
+        /// <summary>
         /// Get all doctors for admin schedule view
         /// </summary>
         [HttpGet]
@@ -302,37 +313,7 @@ namespace HopewellClinicApi.Controllers
             }
         }
 
-        // Doctor Shift Management
-        [HttpGet("{doctorId}/shifts")]
-        [Authorize]
-        public async Task<ActionResult<IEnumerable<object>>> GetDoctorShifts(Guid doctorId)
-        {
-            try
-            {
-                // Use the service layer like DoctorScheduleController does
-                var shifts = await _scheduleService.GetDoctorWeeklyShiftsAsync(doctorId);
-                
-                var shiftResults = shifts.Select(s => new
-                {
-                    id = s.Id,
-                    dayOfWeek = s.DayOfWeek,
-                    startTime = s.ShiftStart.ToString(@"hh\:mm"),
-                    endTime = s.ShiftEnd.ToString(@"hh\:mm"),
-                    isActive = s.IsActive,
-                    doctorId = s.DoctorId
-                }).ToList();
-
-                return Ok(shiftResults);
-            }
-            catch (ArgumentException ex)
-            {
-                return NotFound(new { error = "DOCTOR_NOT_FOUND", message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "INTERNAL_ERROR", message = "An error occurred while retrieving the shifts" });
-            }
-        }
+        // Doctor Shift Management - Redirect to BookingController
 
         [HttpPut("{doctorId}/shifts")]
         [Authorize]
@@ -415,7 +396,7 @@ namespace HopewellClinicApi.Controllers
 
                 appointment.ApprovalStatus = ApprovalStatus.Rejected;
                 appointment.Status = "cancelled";
-                appointment.RejectionReason = request.RejectionReason;
+                appointment.RejectionReason = request.Reason;
                 appointment.ApprovedAt = DateTime.UtcNow;
                 appointment.ApprovedBy = User.Identity?.Name; // Get current user ID
                 appointment.UpdatedAt = DateTime.UtcNow;

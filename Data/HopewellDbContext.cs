@@ -19,6 +19,13 @@ namespace HopewellClinicApi.Data
         public DbSet<Appointment> Appointments { get; set; }
         public DbSet<DoctorShift> DoctorShifts { get; set; }
         public DbSet<ShiftSchedule> ShiftSchedules { get; set; }
+        public DbSet<AppointmentAuditLog> AppointmentAuditLogs { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+        public DbSet<NotificationSettings> NotificationSettings { get; set; }
+        public DbSet<NotificationReply> NotificationReplies { get; set; }
+        public DbSet<PushSubscription> PushSubscriptions { get; set; }
+        public DbSet<DoctorAvailability> DoctorAvailability { get; set; }
+        public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -109,6 +116,59 @@ namespace HopewellClinicApi.Data
             modelBuilder.Entity<Service>().Property(s => s.Price).HasPrecision(10, 2);
             modelBuilder.Entity<Appointment>().Property(a => a.ServicePrice).HasPrecision(10, 2);
 
+            // AppointmentAuditLog configuration
+            modelBuilder.Entity<AppointmentAuditLog>()
+                .HasOne(a => a.Appointment)
+                .WithMany()
+                .HasForeignKey(a => a.AppointmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AppointmentAuditLog>()
+                .HasOne(a => a.PerformedByUser)
+                .WithMany()
+                .HasForeignKey(a => a.PerformedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // DoctorAvailability configuration
+            modelBuilder.Entity<DoctorAvailability>()
+                .HasOne(da => da.Doctor)
+                .WithMany()
+                .HasForeignKey(da => da.DoctorId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<DoctorAvailability>()
+                .Property(da => da.Date).HasColumnType("date");
+
+            // Unique constraint for DoctorId and Date
+            modelBuilder.Entity<DoctorAvailability>()
+                .HasIndex(da => new { da.DoctorId, da.Date })
+                .IsUnique();
+
+            // Indexes for performance
+            modelBuilder.Entity<DoctorAvailability>()
+                .HasIndex(da => da.Date);
+
+            modelBuilder.Entity<DoctorAvailability>()
+                .HasIndex(da => da.IsFullyBooked);
+
+            // PasswordResetToken configuration
+            modelBuilder.Entity<PasswordResetToken>()
+                .HasOne(prt => prt.User)
+                .WithMany()
+                .HasForeignKey(prt => prt.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes for PasswordResetToken
+            modelBuilder.Entity<PasswordResetToken>()
+                .HasIndex(prt => prt.Token)
+                .IsUnique();
+
+            modelBuilder.Entity<PasswordResetToken>()
+                .HasIndex(prt => prt.UserId);
+
+            modelBuilder.Entity<PasswordResetToken>()
+                .HasIndex(prt => prt.ExpiresAt);
+
             // Seed static data
             DataSeeder.SeedData(modelBuilder);
         }
@@ -131,7 +191,8 @@ namespace HopewellClinicApi.Data
             var entries = ChangeTracker.Entries()
                 .Where(e => e.Entity is Patient || e.Entity is Staff || e.Entity is Service ||
                             e.Entity is Appointment || e.Entity is TimeSlot || e.Entity is ApplicationUser ||
-                            e.Entity is ApplicationRole || e.Entity is DoctorShift || e.Entity is ShiftSchedule);
+                            e.Entity is ApplicationRole || e.Entity is DoctorShift || e.Entity is ShiftSchedule ||
+                            e.Entity is DoctorAvailability);
 
             foreach (var entry in entries)
             {

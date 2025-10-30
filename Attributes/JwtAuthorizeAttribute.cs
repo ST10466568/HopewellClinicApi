@@ -95,7 +95,11 @@ namespace HopewellClinicApi.Attributes
                     Console.WriteLine($"JwtAuthorize Inner Exception: {ex.InnerException.Message}");
                 }
                 
-                context.Result = new StatusCodeResult(500);
+                // Return 401 Unauthorized instead of 500 for authentication errors
+                context.Result = new UnauthorizedObjectResult(new { 
+                    message = "Authentication failed", 
+                    error = ex.Message 
+                });
                 return;
             }
         }

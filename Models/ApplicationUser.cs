@@ -9,6 +9,12 @@ namespace HopewellClinicApi.Models
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        
+        // Additional user fields for admin management
+        public DateTime? DateOfBirth { get; set; }
+        public string? Address { get; set; }
+        public string? EmergencyContact { get; set; }
+        public string? EmergencyPhone { get; set; }
 
         // Navigation properties
         public virtual Patient? Patient { get; set; }

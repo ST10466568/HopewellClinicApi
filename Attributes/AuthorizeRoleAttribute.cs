@@ -19,7 +19,8 @@ namespace HopewellClinicApi.Attributes
         {
             var user = context.HttpContext.User;
             
-            if (!user.Identity?.IsAuthenticated ?? true)
+            // Check if user has claims (JWT token validation)
+            if (!user.Claims.Any())
             {
                 context.Result = new UnauthorizedObjectResult(new { error = "Authentication required" });
                 return;
@@ -27,10 +28,10 @@ namespace HopewellClinicApi.Attributes
 
             var userRoles = user.Claims
                 .Where(c => c.Type == ClaimTypes.Role)
-                .Select(c => c.Value)
+                .Select(c => c.Value.ToLower())
                 .ToList();
 
-            if (!_allowedRoles.Any(role => userRoles.Contains(role)))
+            if (!_allowedRoles.Any(role => userRoles.Contains(role.ToLower())))
             {
                 context.Result = new ForbidResult();
                 return;

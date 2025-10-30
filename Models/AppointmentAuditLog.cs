@@ -15,28 +15,38 @@ namespace HopewellClinicApi.Models
 
         [Required]
         [Column("action")]
-        [MaxLength(20)]
-        public string Action { get; set; } = string.Empty; // 'created', 'updated', 'deleted'
+        [MaxLength(50)]
+        public string Action { get; set; } = string.Empty; // 'created', 'updated', 'approved', 'rejected', 'cancelled'
+
+        [Column("old_status")]
+        [MaxLength(50)]
+        public string? OldStatus { get; set; }
+
+        [Column("new_status")]
+        [MaxLength(50)]
+        public string? NewStatus { get; set; }
+
+        [Column("reason")]
+        [MaxLength(500)]
+        public string? Reason { get; set; }
 
         [Required]
-        [Column("changed_by")]
-        public Guid ChangedBy { get; set; }
+        [Column("performed_by")]
+        public Guid PerformedBy { get; set; }
 
         [Required]
-        [Column("changed_at")]
-        public DateTime ChangedAt { get; set; } = DateTime.UtcNow;
+        [Column("performed_at")]
+        public DateTime PerformedAt { get; set; } = DateTime.UtcNow;
 
-        [Column("old_values")]
-        public string? OldValues { get; set; } // JSON of old values
-
-        [Column("new_values")]
-        public string? NewValues { get; set; } // JSON of new values
+        [Column("details")]
+        [MaxLength(1000)]
+        public string? Details { get; set; }
 
         // Navigation properties
         [ForeignKey("AppointmentId")]
         public virtual Appointment Appointment { get; set; } = null!;
 
-        [ForeignKey("ChangedBy")]
-        public virtual Staff ChangedByStaff { get; set; } = null!;
+        [ForeignKey("PerformedBy")]
+        public virtual ApplicationUser PerformedByUser { get; set; } = null!;
     }
 }

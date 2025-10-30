@@ -297,7 +297,13 @@ public class StaffController : ControllerBase
                                        LastName = u.LastName,
                                        Role = r.Name ?? "staff",
                                        Phone = u.PhoneNumber,
-                                       IsActive = u.IsActive
+                                       DateOfBirth = u.DateOfBirth != null ? u.DateOfBirth.Value.ToString("yyyy-MM-dd") : null,
+                                       Address = u.Address,
+                                       EmergencyContact = u.EmergencyContact,
+                                       EmergencyPhone = u.EmergencyPhone,
+                                       IsActive = u.IsActive,
+                                       CreatedAt = u.CreatedAt,
+                                       UpdatedAt = u.UpdatedAt
                                    }).FirstOrDefaultAsync();
 
                 if (staff == null)
@@ -332,7 +338,13 @@ public class StaffController : ControllerBase
                                        LastName = u.LastName,
                                        Role = r.Name ?? "staff",
                                        Phone = u.PhoneNumber,
-                                       IsActive = u.IsActive
+                                       DateOfBirth = u.DateOfBirth != null ? u.DateOfBirth.Value.ToString("yyyy-MM-dd") : null,
+                                       Address = u.Address,
+                                       EmergencyContact = u.EmergencyContact,
+                                       EmergencyPhone = u.EmergencyPhone,
+                                       IsActive = u.IsActive,
+                                       CreatedAt = u.CreatedAt,
+                                       UpdatedAt = u.UpdatedAt
                                    }).ToListAsync();
 
                 return Ok(staff);
@@ -460,7 +472,9 @@ public class StaffController : ControllerBase
 
 
         /// <summary>
-        /// Get all active staff members (doctors) - Anonymous access for frontend
+        /// Get ONLY staff members (doctors, nurses, admin) - NOT for user management
+        /// This endpoint is for staff-specific operations, not comprehensive user management
+        /// For admin user management (all users), use GET /api/Admin/users instead
         /// </summary>
         [HttpGet]
         [AllowAnonymous]
@@ -492,7 +506,12 @@ public class StaffController : ControllerBase
                         role = x.Role.Name ?? "staff",
                         isActive = x.User.IsActive,
                         staffNumber = x.Staff.StaffNumber,
-                        phone = x.User.PhoneNumber
+                        phone = x.User.PhoneNumber,
+                        dateOfBirth = x.User.DateOfBirth != null ? x.User.DateOfBirth.Value.ToString("yyyy-MM-dd") : null,
+                        address = x.User.Address,
+                        emergencyContact = x.User.EmergencyContact,
+                        emergencyPhone = x.User.EmergencyPhone,
+                        createdAt = x.User.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
                     })
                     .ToListAsync();
 

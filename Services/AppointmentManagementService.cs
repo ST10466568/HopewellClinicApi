@@ -343,10 +343,9 @@ namespace HopewellClinicApi.Services
                 {
                     AppointmentId = appointmentId,
                     Action = action,
-                    ChangedBy = changedBy,
-                    ChangedAt = DateTime.UtcNow,
-                    OldValues = oldAppointment != null ? JsonSerializer.Serialize(oldAppointment) : null,
-                    NewValues = newAppointment != null ? JsonSerializer.Serialize(newAppointment) : null
+                    PerformedBy = changedBy,
+                    PerformedAt = DateTime.UtcNow,
+                    Details = oldAppointment != null ? JsonSerializer.Serialize(oldAppointment) : null
                 };
 
                 _context.AppointmentAuditLogs.Add(auditLog);

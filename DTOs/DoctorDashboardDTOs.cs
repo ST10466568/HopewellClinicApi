@@ -45,18 +45,6 @@ namespace HopewellClinicApi.DTOs
         public bool IsActive { get; set; }
     }
 
-    // Appointment Approval DTOs
-    public class ApproveAppointmentRequest
-    {
-        public string? Notes { get; set; }
-    }
-
-    public class RejectAppointmentRequest
-    {
-        [Required]
-        public string RejectionReason { get; set; } = string.Empty;
-    }
-
     // Enhanced Appointment Response with Approval Info
     public class AppointmentWithApprovalResponse
     {

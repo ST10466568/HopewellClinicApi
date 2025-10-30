@@ -25,8 +25,17 @@ namespace HopewellClinicApi.DTOs
     // Patient Management DTOs
     public class UpdatePatientRequest
     {
-        public string? Address { get; set; }
-        public string? PhoneNumber { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? PhoneNumber { get; set; } // Backward compatibility
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? Address { get; set; } // Backward compatibility - will be populated from AddressObject if needed
+        [System.Text.Json.Serialization.JsonPropertyName("address")]
+        public AddressDto? AddressObject { get; set; } // Accepts nested object (frontend sends "address")
+        [System.Text.Json.Serialization.JsonPropertyName("emergencyContact")]
+        public EmergencyContactDto? EmergencyContact { get; set; }
     }
 
 
@@ -80,6 +89,18 @@ namespace HopewellClinicApi.DTOs
 
         [Required]
         public string Role { get; set; } = string.Empty;
+
+        // Optional fields
+        public string? Phone { get; set; }
+        
+        [RegularExpression(@"^\d{4}-\d{2}-\d{2}$", ErrorMessage = "Date must be in YYYY-MM-DD format")]
+        public string? DateOfBirth { get; set; }
+        
+        public string? Address { get; set; }
+        
+        public string? EmergencyContact { get; set; }
+        
+        public string? EmergencyPhone { get; set; }
     }
 
     // Enhanced Patient Creation DTOs
@@ -286,6 +307,8 @@ namespace HopewellClinicApi.DTOs
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public List<ServiceRevenueDto> ServiceBreakdown { get; set; } = new List<ServiceRevenueDto>();
+        public List<RevenueByMonthDto> RevenueByMonth { get; set; } = new List<RevenueByMonthDto>();
+        public List<RevenueByWeekDto> RevenueByWeek { get; set; } = new List<RevenueByWeekDto>();
     }
 
     public class ServiceRevenueDto
@@ -294,5 +317,119 @@ namespace HopewellClinicApi.DTOs
         public string ServiceName { get; set; } = string.Empty;
         public int AppointmentCount { get; set; }
         public decimal Revenue { get; set; }
+    }
+
+    // Revenue breakdown DTOs
+    public class RevenueByMonthDto
+    {
+        public string Month { get; set; } = string.Empty; // yyyy-MM
+        public decimal Revenue { get; set; }
+        public int AppointmentCount { get; set; }
+    }
+
+    public class RevenueByWeekDto
+    {
+        public string WeekStart { get; set; } = string.Empty; // yyyy-MM-dd (Monday)
+        public decimal Revenue { get; set; }
+        public int AppointmentCount { get; set; }
+    }
+
+    // Service usage analytics
+    public class ServiceUsageItemDto
+    {
+        public Guid ServiceId { get; set; }
+        public string ServiceName { get; set; } = string.Empty;
+        public int UsageCount { get; set; }
+        public double PercentageOfTotal { get; set; }
+        public decimal AveragePrice { get; set; }
+    }
+
+    public class DateRangeDto
+    {
+        public string StartDate { get; set; } = string.Empty; // ISO yyyy-MM-dd
+        public string EndDate { get; set; } = string.Empty;   // ISO yyyy-MM-dd
+    }
+
+    public class ServiceUsageReportDto
+    {
+        public List<ServiceUsageItemDto> Services { get; set; } = new List<ServiceUsageItemDto>();
+        public int TotalAppointments { get; set; }
+        public DateRangeDto DateRange { get; set; } = new DateRangeDto();
+    }
+
+    // Comprehensive analytics response
+    public class ComprehensiveAnalyticsDto
+    {
+        public AppointmentStatsDto AppointmentStats { get; set; } = new AppointmentStatsDto();
+        public List<ServiceUsageItemDto> ServiceUsage { get; set; } = new List<ServiceUsageItemDto>();
+        public RevenueReportDto RevenueData { get; set; } = new RevenueReportDto();
+        public DateRangeDto DateRange { get; set; } = new DateRangeDto();
+        public DateTime GeneratedAt { get; set; }
+    }
+
+    // Standard API error
+    public class ApiErrorDto
+    {
+        public string Error { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
+    }
+
+    // User Profile Update DTOs
+    public class AddressDto
+    {
+        public string? Street { get; set; }
+        public string? City { get; set; }
+        public string? State { get; set; }
+        public string? ZipCode { get; set; }
+        public string? Country { get; set; }
+    }
+
+    public class EmergencyContactDto
+    {
+        public string? Name { get; set; }
+        public string? Phone { get; set; }
+        public string? Relationship { get; set; }
+        public string? Email { get; set; }
+    }
+
+    public class UpdateProfileRequest
+    {
+        [Required]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required]
+        public string LastName { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public string? Phone { get; set; }
+
+        public AddressDto? Address { get; set; }
+
+        public EmergencyContactDto? EmergencyContact { get; set; }
+    }
+
+    public class ProfileUpdateResponse
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public ProfileDataDto? Data { get; set; }
+        public string? Error { get; set; }
+        public Dictionary<string, string>? Errors { get; set; }
+    }
+
+    public class ProfileDataDto
+    {
+        public Guid Id { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public AddressDto? Address { get; set; }
+        public EmergencyContactDto? EmergencyContact { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

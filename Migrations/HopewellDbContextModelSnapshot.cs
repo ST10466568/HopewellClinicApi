@@ -85,11 +85,17 @@ namespace HopewellClinicApi.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("int");
 
+                    b.Property<string>("Address")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
@@ -98,6 +104,12 @@ namespace HopewellClinicApi.Migrations
 
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
+
+                    b.Property<string>("EmergencyContact")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EmergencyPhone")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -163,8 +175,8 @@ namespace HopewellClinicApi.Migrations
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441001"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "43a18c73-ac88-4c6f-9092-e061522e99cf",
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(5420),
+                            ConcurrencyStamp = "8dc31d06-6e29-444e-b1e9-cb7511f90714",
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3044),
                             Email = "nomsa.mandela@hopewell.com",
                             EmailConfirmed = true,
                             FirstName = "Dr. Nomsa",
@@ -177,15 +189,15 @@ namespace HopewellClinicApi.Migrations
                             PhoneNumber = "+27123456789",
                             PhoneNumberConfirmed = true,
                             TwoFactorEnabled = false,
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(5426),
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3047),
                             UserName = "nomsa.mandela@hopewell.com"
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441003"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "26d71edf-83a9-4c87-a093-77f17503ca78",
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(5686),
+                            ConcurrencyStamp = "f5a1367c-37ec-4b8b-aaf8-8d929659aabf",
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3286),
                             Email = "thabo.sithole@hopewell.com",
                             EmailConfirmed = true,
                             FirstName = "Dr. Thabo",
@@ -198,15 +210,15 @@ namespace HopewellClinicApi.Migrations
                             PhoneNumber = "+27123456790",
                             PhoneNumberConfirmed = true,
                             TwoFactorEnabled = false,
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(5691),
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3286),
                             UserName = "thabo.sithole@hopewell.com"
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441004"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "b5b9ccc6-8763-4815-b992-e365c626283a",
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6556),
+                            ConcurrencyStamp = "e65c15b7-65e6-42b3-8e6c-887606cc7d5e",
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3630),
                             Email = "john.doe@test.com",
                             EmailConfirmed = true,
                             FirstName = "John",
@@ -219,7 +231,7 @@ namespace HopewellClinicApi.Migrations
                             PhoneNumber = "+27123456791",
                             PhoneNumberConfirmed = true,
                             TwoFactorEnabled = false,
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6557),
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3631),
                             UserName = "john.doe@test.com"
                         });
                 });
@@ -344,37 +356,109 @@ namespace HopewellClinicApi.Migrations
 
                     b.Property<string>("Action")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
                         .HasColumnName("action");
 
                     b.Property<Guid>("AppointmentId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("appointment_id");
 
-                    b.Property<DateTime>("ChangedAt")
+                    b.Property<string>("Details")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("details");
+
+                    b.Property<string>("NewStatus")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("new_status");
+
+                    b.Property<string>("OldStatus")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("old_status");
+
+                    b.Property<DateTime>("PerformedAt")
                         .HasColumnType("datetime2")
-                        .HasColumnName("changed_at");
+                        .HasColumnName("performed_at");
 
-                    b.Property<Guid>("ChangedBy")
+                    b.Property<Guid>("PerformedBy")
                         .HasColumnType("uniqueidentifier")
-                        .HasColumnName("changed_by");
+                        .HasColumnName("performed_by");
 
-                    b.Property<string>("NewValues")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("new_values");
-
-                    b.Property<string>("OldValues")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("old_values");
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("reason");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AppointmentId");
 
-                    b.HasIndex("ChangedBy");
+                    b.HasIndex("PerformedBy");
 
                     b.ToTable("AppointmentAuditLog");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.DoctorAvailability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AvailableSlots")
+                        .HasColumnType("int")
+                        .HasColumnName("available_slots");
+
+                    b.Property<int>("BookedSlots")
+                        .HasColumnType("int")
+                        .HasColumnName("booked_slots");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<Guid>("DoctorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("doctor_id");
+
+                    b.Property<bool>("IsFullyBooked")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_fully_booked");
+
+                    b.Property<bool>("IsOnDuty")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_on_duty");
+
+                    b.Property<int>("TotalSlots")
+                        .HasColumnType("int")
+                        .HasColumnName("total_slots");
+
+                    b.Property<string>("UnavailabilityReason")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("unavailability_reason");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("IsFullyBooked");
+
+                    b.HasIndex("DoctorId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("doctor_availability");
                 });
 
             modelBuilder.Entity("HopewellClinicApi.Models.DoctorShift", b =>
@@ -419,6 +503,209 @@ namespace HopewellClinicApi.Migrations
                     b.HasIndex("DoctorId");
 
                     b.ToTable("doctor_shifts");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AppointmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EmailContent")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EmailSubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ScheduledFor")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("SenderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SenderName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("SenderRole")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ServiceName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("ThreadId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("SenderId");
+
+                    b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.NotificationReply", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SenderName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("SenderRole")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ThreadId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotificationId");
+
+                    b.HasIndex("SenderId");
+
+                    b.ToTable("NotificationReplies");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.NotificationSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AppointmentConfirmations")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("AutoReminder24h")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("AutoReminder2h")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ClinicAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClinicEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("ClinicPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("EmailNotifications")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("InsuranceReminders")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("PrescriptionAlerts")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("SmsNotifications")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("TestResultAlerts")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("NotificationSettings");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("HopewellClinicApi.Models.Patient", b =>
@@ -476,6 +763,45 @@ namespace HopewellClinicApi.Migrations
                     b.ToTable("patients");
                 });
 
+            modelBuilder.Entity("HopewellClinicApi.Models.PushSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AuthKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("P256dhKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserRole")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PushSubscriptions");
+                });
+
             modelBuilder.Entity("HopewellClinicApi.Models.Service", b =>
                 {
                     b.Property<Guid>("Id")
@@ -522,52 +848,52 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440000"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6103),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3455),
                             Description = "General medical consultation and examination",
                             DurationMinutes = 30,
                             IsActive = true,
                             Name = "General Consultation",
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6114)
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3455)
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440001"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6154),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3466),
                             Description = "Health services for infants and children",
                             DurationMinutes = 30,
                             IsActive = true,
                             Name = "Pediatrics Consultation",
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6154)
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3466)
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440002"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6158),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3470),
                             Description = "Routine dental examination and cleaning",
                             DurationMinutes = 45,
                             IsActive = true,
                             Name = "Dental Checkup",
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6158)
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3470)
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440003"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6165),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3473),
                             Description = "Physical therapy for rehabilitation",
                             DurationMinutes = 60,
                             IsActive = true,
                             Name = "Physiotherapy Session",
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6165)
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3473)
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440004"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6237),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3476),
                             Description = "Routine immunizations and boosters",
                             DurationMinutes = 20,
                             IsActive = true,
                             Name = "Vaccination",
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6237)
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3476)
                         });
                 });
 
@@ -656,19 +982,19 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441000"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6326),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3519),
                             IsActive = true,
                             StaffNumber = "DOC001",
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6331),
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3519),
                             UserId = new Guid("550e8400-e29b-41d4-a716-446655441001")
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441002"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6347),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3527),
                             IsActive = true,
                             StaffNumber = "DOC002",
-                            UpdatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6348),
+                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3528),
                             UserId = new Guid("550e8400-e29b-41d4-a716-446655441003")
                         });
                 });
@@ -735,7 +1061,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443101"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6407),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3561),
                             DayOfWeek = 1,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -747,7 +1073,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443102"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6423),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3567),
                             DayOfWeek = 1,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -759,7 +1085,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443103"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6433),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3571),
                             DayOfWeek = 1,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),
@@ -771,7 +1097,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443201"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6444),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3575),
                             DayOfWeek = 2,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -783,7 +1109,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443202"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6447),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3577),
                             DayOfWeek = 2,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -795,7 +1121,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443203"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6458),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3580),
                             DayOfWeek = 2,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),
@@ -807,7 +1133,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443301"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6461),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3582),
                             DayOfWeek = 3,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -819,7 +1145,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443302"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6464),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3588),
                             DayOfWeek = 3,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -831,7 +1157,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443303"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6471),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3590),
                             DayOfWeek = 3,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),
@@ -843,7 +1169,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443401"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6476),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3592),
                             DayOfWeek = 4,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -855,7 +1181,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443402"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6478),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3595),
                             DayOfWeek = 4,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -867,7 +1193,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443403"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6483),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3597),
                             DayOfWeek = 4,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),
@@ -879,7 +1205,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443501"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6485),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3599),
                             DayOfWeek = 5,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -891,7 +1217,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443502"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6491),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3602),
                             DayOfWeek = 5,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -903,7 +1229,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443503"),
-                            CreatedAt = new DateTime(2025, 10, 11, 19, 59, 6, 603, DateTimeKind.Utc).AddTicks(6494),
+                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3607),
                             DayOfWeek = 5,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),
@@ -1068,15 +1394,26 @@ namespace HopewellClinicApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("HopewellClinicApi.Models.Staff", "ChangedByStaff")
+                    b.HasOne("HopewellClinicApi.Models.ApplicationUser", "PerformedByUser")
                         .WithMany()
-                        .HasForeignKey("ChangedBy")
+                        .HasForeignKey("PerformedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Appointment");
 
-                    b.Navigation("ChangedByStaff");
+                    b.Navigation("PerformedByUser");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.DoctorAvailability", b =>
+                {
+                    b.HasOne("HopewellClinicApi.Models.Staff", "Doctor")
+                        .WithMany()
+                        .HasForeignKey("DoctorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Doctor");
                 });
 
             modelBuilder.Entity("HopewellClinicApi.Models.DoctorShift", b =>
@@ -1090,11 +1427,73 @@ namespace HopewellClinicApi.Migrations
                     b.Navigation("Doctor");
                 });
 
+            modelBuilder.Entity("HopewellClinicApi.Models.Notification", b =>
+                {
+                    b.HasOne("HopewellClinicApi.Models.Appointment", "Appointment")
+                        .WithMany()
+                        .HasForeignKey("AppointmentId");
+
+                    b.HasOne("HopewellClinicApi.Models.ApplicationUser", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId");
+
+                    b.HasOne("HopewellClinicApi.Models.ApplicationUser", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId");
+
+                    b.Navigation("Appointment");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("Sender");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.NotificationReply", b =>
+                {
+                    b.HasOne("HopewellClinicApi.Models.Notification", "Notification")
+                        .WithMany("Replies")
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HopewellClinicApi.Models.ApplicationUser", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Notification");
+
+                    b.Navigation("Sender");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.PasswordResetToken", b =>
+                {
+                    b.HasOne("HopewellClinicApi.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("HopewellClinicApi.Models.Patient", b =>
                 {
                     b.HasOne("HopewellClinicApi.Models.ApplicationUser", "User")
                         .WithOne("Patient")
                         .HasForeignKey("HopewellClinicApi.Models.Patient", "UserId");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.PushSubscription", b =>
+                {
+                    b.HasOne("HopewellClinicApi.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -1190,6 +1589,11 @@ namespace HopewellClinicApi.Migrations
                     b.Navigation("Patient");
 
                     b.Navigation("Staff");
+                });
+
+            modelBuilder.Entity("HopewellClinicApi.Models.Notification", b =>
+                {
+                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("HopewellClinicApi.Models.Patient", b =>

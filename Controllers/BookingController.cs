@@ -4,7 +4,9 @@ using HopewellClinicApi.Services;
 using HopewellClinicApi.DTOs;
 using HopewellClinicApi.Attributes;
 using HopewellClinicApi.Data;
+using HopewellClinicApi.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace HopewellClinicApi.Controllers
 {
@@ -13,12 +15,18 @@ namespace HopewellClinicApi.Controllers
     public class BookingController : ControllerBase
     {
         private readonly BookingService _bookingService;
+        private readonly EnhancedBookingService _enhancedBookingService;
         private readonly ILogger<BookingController> _logger;
         private readonly HopewellDbContext _context;
 
-        public BookingController(BookingService bookingService, ILogger<BookingController> logger, HopewellDbContext context)
+        public BookingController(
+            BookingService bookingService, 
+            EnhancedBookingService enhancedBookingService,
+            ILogger<BookingController> logger, 
+            HopewellDbContext context)
         {
             _bookingService = bookingService;
+            _enhancedBookingService = enhancedBookingService;
             _logger = logger;
             _context = context;
         }
@@ -482,6 +490,685 @@ namespace HopewellClinicApi.Controllers
                 _logger.LogError(ex, "Error getting debug appointments for doctor: {DoctorId}, date: {Date}", doctorId, date);
                 return StatusCode(500, new { error = "DEBUG_APPOINTMENTS_ERROR", message = ex.Message });
             }
+        }
+
+        // ===== ENHANCED AVAILABILITY ENDPOINTS =====
+
+        /// <summary>
+        /// Enhanced: Get doctors on duty with availability information
+        /// </summary>
+        [HttpGet("doctors-on-duty-enhanced")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<DoctorOnDutyWithAvailabilityResponse>>> GetDoctorsOnDutyEnhanced(
+            [FromQuery] DateTime date, 
+            [FromQuery] Guid? serviceId = null,
+            [FromQuery] bool includeFullyBooked = false)
+        {
+            try
+            {
+                var response = await _enhancedBookingService.GetDoctorsOnDutyWithAvailabilityAsync(date, serviceId, includeFullyBooked);
+                return Ok(new ApiResponse<DoctorOnDutyWithAvailabilityResponse>
+                {
+                    Success = true,
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting enhanced doctors on duty for date: {Date}", date);
+                return StatusCode(500, new ApiResponse<DoctorOnDutyWithAvailabilityResponse>
+                {
+                    Success = false,
+                    Error = "DOCTORS_ON_DUTY_ERROR",
+                    Message = "An error occurred while retrieving doctors on duty."
+                });
+            }
+        }
+
+        /// <summary>
+        /// Enhanced: Get available time slots with doctor availability information
+        /// </summary>
+        [HttpGet("available-slots-enhanced")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<AvailableSlotsWithAvailabilityResponse>>> GetAvailableSlotsEnhanced(
+            [FromQuery] Guid doctorId, 
+            [FromQuery] DateTime date, 
+            [FromQuery] Guid? serviceId = null)
+        {
+            try
+            {
+                var response = await _enhancedBookingService.GetAvailableSlotsWithAvailabilityAsync(doctorId, date, serviceId);
+                return Ok(new ApiResponse<AvailableSlotsWithAvailabilityResponse>
+                {
+                    Success = true,
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting enhanced available slots for doctor: {DoctorId} on date: {Date}", doctorId, date);
+                return StatusCode(500, new ApiResponse<AvailableSlotsWithAvailabilityResponse>
+                {
+                    Success = false,
+                    Error = "AVAILABLE_SLOTS_ERROR",
+                    Message = "An error occurred while retrieving available time slots."
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get availability summary for a specific date
+        /// </summary>
+        [HttpGet("availability-summary")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<AvailabilitySummaryResponse>>> GetAvailabilitySummary(
+            [FromQuery] DateTime date)
+        {
+            try
+            {
+                var response = await _enhancedBookingService.GetAvailabilitySummaryAsync(date);
+                return Ok(new ApiResponse<AvailabilitySummaryResponse>
+                {
+                    Success = true,
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting availability summary for date: {Date}", date);
+                return StatusCode(500, new ApiResponse<AvailabilitySummaryResponse>
+                {
+                    Success = false,
+                    Error = "AVAILABILITY_SUMMARY_ERROR",
+                    Message = "An error occurred while retrieving availability summary."
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get next available dates for a specific doctor
+        /// </summary>
+        [HttpGet("next-available-dates/{doctorId}")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<NextAvailableDatesResponse>>> GetNextAvailableDates(
+            Guid doctorId,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] int maxDays = 7)
+        {
+            try
+            {
+                var response = await _enhancedBookingService.GetNextAvailableDatesAsync(doctorId, startDate, maxDays);
+                return Ok(new ApiResponse<NextAvailableDatesResponse>
+                {
+                    Success = true,
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting next available dates for doctor: {DoctorId}", doctorId);
+                return StatusCode(500, new ApiResponse<NextAvailableDatesResponse>
+                {
+                    Success = false,
+                    Error = "NEXT_AVAILABLE_DATES_ERROR",
+                    Message = "An error occurred while retrieving next available dates."
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get only available doctors (not fully booked)
+        /// </summary>
+        [HttpGet("available-doctors-only")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<List<DoctorOnDutyWithAvailabilityDto>>>> GetAvailableDoctorsOnly(
+            [FromQuery] DateTime date,
+            [FromQuery] Guid? serviceId = null)
+        {
+            try
+            {
+                var response = await _enhancedBookingService.GetAvailableDoctorsAsync(date, serviceId);
+                return Ok(new ApiResponse<List<DoctorOnDutyWithAvailabilityDto>>
+                {
+                    Success = true,
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting available doctors only for date: {Date}", date);
+                return StatusCode(500, new ApiResponse<List<DoctorOnDutyWithAvailabilityDto>>
+                {
+                    Success = false,
+                    Error = "AVAILABLE_DOCTORS_ERROR",
+                    Message = "An error occurred while retrieving available doctors."
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get only fully booked doctors
+        /// </summary>
+        [HttpGet("fully-booked-doctors")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<List<DoctorOnDutyWithAvailabilityDto>>>> GetFullyBookedDoctors(
+            [FromQuery] DateTime date,
+            [FromQuery] Guid? serviceId = null)
+        {
+            try
+            {
+                var response = await _enhancedBookingService.GetFullyBookedDoctorsAsync(date, serviceId);
+                return Ok(new ApiResponse<List<DoctorOnDutyWithAvailabilityDto>>
+                {
+                    Success = true,
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting fully booked doctors for date: {Date}", date);
+                return StatusCode(500, new ApiResponse<List<DoctorOnDutyWithAvailabilityDto>>
+                {
+                    Success = false,
+                    Error = "FULLY_BOOKED_DOCTORS_ERROR",
+                    Message = "An error occurred while retrieving fully booked doctors."
+                });
+            }
+        }
+
+        /// <summary>
+        /// Enhanced: Create appointment with availability validation
+        /// </summary>
+        [HttpPost("create-appointment-enhanced")]
+        [JwtAuthorize]
+        public async Task<ActionResult<ApiResponse<AppointmentBookingResponse>>> CreateAppointmentEnhanced([FromBody] CreateBookingAppointmentRequest request)
+        {
+            try
+            {
+                var response = await _enhancedBookingService.CreateAppointmentWithAvailabilityAsync(request);
+                return Ok(new ApiResponse<AppointmentBookingResponse>
+                {
+                    Success = true,
+                    Data = response,
+                    Message = "Appointment created successfully"
+                });
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "DOCTOR_FULLY_BOOKED")
+            {
+                return BadRequest(new ApiResponse<AppointmentBookingResponse>
+                {
+                    Success = false,
+                    Error = "DOCTOR_FULLY_BOOKED",
+                    Message = "The selected doctor is fully booked on the chosen date.",
+                    Data = null
+                });
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "DOCTOR_NOT_ON_DUTY")
+            {
+                return BadRequest(new ApiResponse<AppointmentBookingResponse>
+                {
+                    Success = false,
+                    Error = "DOCTOR_NOT_ON_DUTY",
+                    Message = "The selected doctor is not on duty on the chosen date.",
+                    Data = null
+                });
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "INVALID_APPOINTMENT_TIME")
+            {
+                return BadRequest(new ApiResponse<AppointmentBookingResponse>
+                {
+                    Success = false,
+                    Error = "INVALID_APPOINTMENT_TIME",
+                    Message = "The selected time is outside the doctor's working hours.",
+                    Data = null
+                });
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "APPOINTMENT_CONFLICT")
+            {
+                return BadRequest(new ApiResponse<AppointmentBookingResponse>
+                {
+                    Success = false,
+                    Error = "APPOINTMENT_CONFLICT",
+                    Message = "The selected time slot is no longer available.",
+                    Data = null
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating enhanced appointment for patient: {PatientId}", request.PatientId);
+                return StatusCode(500, new ApiResponse<AppointmentBookingResponse>
+                {
+                    Success = false,
+                    Error = "APPOINTMENT_CREATION_ERROR",
+                    Message = "An error occurred while creating the appointment."
+                });
+            }
+        }
+
+        // ===== SHIFT SCHEDULE INTEGRATION ENDPOINTS =====
+
+        /// <summary>
+        /// Check doctor availability with shift schedule validation
+        /// </summary>
+        [HttpGet("doctor-availability-check")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<DoctorAvailabilityCheckResponse>>> CheckDoctorAvailability(
+            [FromQuery] Guid doctorId,
+            [FromQuery] DateTime date)
+        {
+            try
+            {
+                var availabilityResult = await _enhancedBookingService.AvailabilityService.CheckDoctorAvailabilityAsync(doctorId, date);
+                
+                // Get alternative doctors if not available
+                var alternativeDoctors = new List<AlternativeDoctor>();
+                if (!availabilityResult.IsAvailable)
+                {
+                    var allDoctors = await _context.Staff
+                        .Include(s => s.User)
+                        .Where(s => s.IsActive && s.Id != doctorId)
+                        .ToListAsync();
+
+                    foreach (var staff in allDoctors.Take(3)) // Limit to 3 alternatives
+                    {
+                        var altAvailability = await _enhancedBookingService.AvailabilityService.CheckDoctorAvailabilityAsync(staff.Id, date);
+                        if (altAvailability.IsAvailable)
+                        {
+                            alternativeDoctors.Add(new AlternativeDoctor
+                            {
+                                Id = staff.Id,
+                                Name = $"{staff.User.FirstName} {staff.User.LastName}",
+                                Specialty = "General Practice",
+                                AvailableSlots = altAvailability.AvailableSlots,
+                                Rating = 4.5
+                            });
+                        }
+                    }
+                }
+
+                var response = new DoctorAvailabilityCheckResponse
+                {
+                    DoctorId = doctorId,
+                    Date = date,
+                    IsOnDuty = availabilityResult.IsOnDuty,
+                    IsAvailable = availabilityResult.IsAvailable,
+                    Reason = availabilityResult.UnavailabilityReason,
+                    ShiftSchedule = availabilityResult.ShiftSchedule,
+                    NextAvailableDate = availabilityResult.NextAvailableDate,
+                    AlternativeDoctors = alternativeDoctors
+                };
+
+                return Ok(new ApiResponse<DoctorAvailabilityCheckResponse>
+                {
+                    Success = true,
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking doctor availability for doctor: {DoctorId} on date: {Date}", doctorId, date);
+                return StatusCode(500, new ApiResponse<DoctorAvailabilityCheckResponse>
+                {
+                    Success = false,
+                    Error = "AVAILABILITY_CHECK_ERROR",
+                    Message = "An error occurred while checking doctor availability."
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get doctor shift schedule
+        /// </summary>
+        [HttpGet("doctor/{doctorId}/shifts")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<DoctorShiftScheduleResponse>>> GetDoctorShiftSchedule(Guid doctorId)
+        {
+            try
+            {
+                // Get doctor info
+                var doctor = await _context.Staff
+                    .Include(s => s.User)
+                    .FirstOrDefaultAsync(s => s.Id == doctorId);
+
+                if (doctor == null)
+                {
+                    return NotFound(new ApiResponse<DoctorShiftScheduleResponse>
+                    {
+                        Success = false,
+                        Error = "DOCTOR_NOT_FOUND",
+                        Message = "Doctor not found"
+                    });
+                }
+
+                // Get shift schedules
+                var shifts = await _context.ShiftSchedules
+                    .Where(s => s.DoctorId == doctorId)
+                    .OrderBy(s => s.DayOfWeek)
+                    .ToListAsync();
+
+                var shiftInfos = shifts.Select(s => new DoctorShiftInfo
+                {
+                    Id = s.Id,
+                    DayOfWeek = s.DayOfWeek,
+                    StartTime = s.StartTime.ToString(@"hh\:mm"),
+                    EndTime = s.EndTime.ToString(@"hh\:mm"),
+                    IsActive = s.IsActive,
+                    BreakStartTime = null,
+                    BreakEndTime = null,
+                    EffectiveFrom = null,
+                    EffectiveTo = null
+                }).ToList();
+
+                // Get next available date
+                var nextAvailableDate = await _enhancedBookingService.GetNextAvailableDateAsync(doctorId, DateTime.Today);
+
+                var response = new DoctorShiftScheduleResponse
+                {
+                    DoctorId = doctorId,
+                    DoctorName = $"{doctor.User.FirstName} {doctor.User.LastName}",
+                    Shifts = shiftInfos,
+                    NextAvailableDate = nextAvailableDate,
+                    LastUpdated = DateTime.UtcNow
+                };
+
+                return Ok(new ApiResponse<DoctorShiftScheduleResponse>
+                {
+                    Success = true,
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting doctor shift schedule for doctor: {DoctorId}", doctorId);
+                return StatusCode(500, new ApiResponse<DoctorShiftScheduleResponse>
+                {
+                    Success = false,
+                    Error = "SHIFT_SCHEDULE_ERROR",
+                    Message = "An error occurred while retrieving doctor shift schedule."
+                });
+            }
+        }
+
+        /// <summary>
+        /// Update doctor shift schedule
+        /// </summary>
+        [HttpPut("doctor/{doctorId}/shifts")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<object>>> UpdateDoctorShiftSchedule(Guid doctorId, [FromBody] UpdateShiftScheduleRequest request)
+        {
+            try
+            {
+                // Get doctor info
+                var doctor = await _context.Staff
+                    .Include(s => s.User)
+                    .FirstOrDefaultAsync(s => s.Id == doctorId);
+
+                if (doctor == null)
+                {
+                    return NotFound(new ApiResponse<object>
+                    {
+                        Success = false,
+                        Error = "DOCTOR_NOT_FOUND",
+                        Message = "Doctor not found"
+                    });
+                }
+
+                // Get existing shifts
+                var existingShifts = await _context.ShiftSchedules
+                    .Where(s => s.DoctorId == doctorId)
+                    .ToListAsync();
+
+                // Update or create shifts
+                foreach (var shiftInfo in request.Shifts)
+                {
+                    var existingShift = existingShifts.FirstOrDefault(s => s.DayOfWeek == shiftInfo.DayOfWeek);
+                    
+                    if (existingShift != null)
+                    {
+                        // Update existing shift
+                        existingShift.StartTime = TimeSpan.Parse(shiftInfo.StartTime);
+                        existingShift.EndTime = TimeSpan.Parse(shiftInfo.EndTime);
+                        existingShift.IsActive = shiftInfo.IsActive;
+                        existingShift.UpdatedAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        // Create new shift
+                        var newShift = new ShiftSchedule
+                        {
+                            Id = Guid.NewGuid(),
+                            DoctorId = doctorId,
+                            DayOfWeek = shiftInfo.DayOfWeek,
+                            StartTime = TimeSpan.Parse(shiftInfo.StartTime),
+                            EndTime = TimeSpan.Parse(shiftInfo.EndTime),
+                            IsActive = shiftInfo.IsActive,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        _context.ShiftSchedules.Add(newShift);
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Data = new { message = "Shift schedule updated successfully" }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating doctor shift schedule for doctor: {DoctorId}", doctorId);
+                return StatusCode(500, new ApiResponse<object>
+                {
+                    Success = false,
+                    Error = "SHIFT_SCHEDULE_UPDATE_ERROR",
+                    Message = "An error occurred while updating doctor shift schedule."
+                });
+            }
+        }
+
+        /// <summary>
+        /// Get doctors with shift schedule validation (enhanced version)
+        /// </summary>
+        [HttpGet("doctors-with-shift-validation")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<DoctorsWithShiftValidationResponse>>> GetDoctorsWithShiftValidation(
+            [FromQuery] DateTime date,
+            [FromQuery] bool includeOffDuty = false)
+        {
+            try
+            {
+                var allDoctors = await _context.Staff
+                    .Include(s => s.User)
+                    .Where(s => s.IsActive)
+                    .ToListAsync();
+
+                var doctors = new List<DoctorWithShiftValidation>();
+                var onDutyCount = 0;
+                var offDutyCount = 0;
+                var availableCount = 0;
+                var fullyBookedCount = 0;
+                var totalAvailableSlots = 0;
+                var totalBookedSlots = 0;
+
+                foreach (var staff in allDoctors)
+                {
+                    var availabilityResult = await _enhancedBookingService.AvailabilityService.CheckDoctorAvailabilityAsync(staff.Id, date);
+                    
+                    if (availabilityResult.IsOnDuty)
+                    {
+                        onDutyCount++;
+                        if (availabilityResult.IsAvailable) availableCount++;
+                        if (availabilityResult.IsFullyBooked) fullyBookedCount++;
+                        totalAvailableSlots += availabilityResult.AvailableSlots;
+                        totalBookedSlots += (availabilityResult.TotalSlots - availabilityResult.AvailableSlots);
+                    }
+                    else
+                    {
+                        offDutyCount++;
+                    }
+
+                    // Include off-duty doctors if requested
+                    if (!availabilityResult.IsOnDuty && !includeOffDuty)
+                    {
+                        continue;
+                    }
+
+                    // Get shift info
+                    var shiftInfo = await _enhancedBookingService.AvailabilityService.GetDoctorShiftInfoAsync(staff.Id, date);
+                    var shiftStart = shiftInfo?.StartTime ?? "09:00";
+                    var shiftEnd = shiftInfo?.EndTime ?? "17:00";
+
+                    doctors.Add(new DoctorWithShiftValidation
+                    {
+                        Id = staff.Id,
+                        FirstName = staff.User.FirstName,
+                        LastName = staff.User.LastName,
+                        Email = staff.User.Email ?? "",
+                        Specialty = "General Practice",
+                        Rating = 4.5,
+                        ShiftStart = shiftStart,
+                        ShiftEnd = shiftEnd,
+                        IsOnDuty = availabilityResult.IsOnDuty,
+                        IsAvailable = availabilityResult.IsAvailable,
+                        IsFullyBooked = availabilityResult.IsFullyBooked,
+                        AvailableSlots = availabilityResult.AvailableSlots,
+                        TotalSlots = availabilityResult.TotalSlots,
+                        UnavailabilityReason = availabilityResult.UnavailabilityReason,
+                        NextAvailableDate = availabilityResult.NextAvailableDate,
+                        Services = GetDoctorServices(staff.Id)
+                    });
+                }
+
+                var summary = new EnhancedDoctorAvailabilitySummary
+                {
+                    Date = date,
+                    TotalDoctors = allDoctors.Count,
+                    OnDutyDoctors = onDutyCount,
+                    OffDutyDoctors = offDutyCount,
+                    AvailableDoctors = availableCount,
+                    FullyBookedDoctors = fullyBookedCount,
+                    TotalAvailableSlots = totalAvailableSlots,
+                    TotalBookedSlots = totalBookedSlots
+                };
+
+                var response = new DoctorsWithShiftValidationResponse
+                {
+                    Doctors = doctors,
+                    RequestedDate = date,
+                    Summary = summary
+                };
+
+                return Ok(new ApiResponse<DoctorsWithShiftValidationResponse>
+                {
+                    Success = true,
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting doctors with shift validation for date: {Date}", date);
+                return StatusCode(500, new ApiResponse<DoctorsWithShiftValidationResponse>
+                {
+                    Success = false,
+                    Error = "DOCTORS_SHIFT_VALIDATION_ERROR",
+                    Message = "An error occurred while retrieving doctors with shift validation."
+                });
+            }
+        }
+
+        /// <summary>
+        /// TEMPORARY: Update Dr. John Smith's weekend shifts to inactive
+        /// </summary>
+        [HttpPost("update-dr-john-shifts")]
+        [AllowAnonymous]
+        public async Task<ActionResult> UpdateDrJohnShifts()
+        {
+            try
+            {
+                var doctorId = Guid.Parse("42f78af2-c1c5-486c-9de5-0e7e44a8f0da");
+                
+                // Update Friday shift to inactive
+                var fridayShift = await _context.ShiftSchedules
+                    .FirstOrDefaultAsync(s => s.DoctorId == doctorId && s.DayOfWeek == "Friday");
+                
+                if (fridayShift != null)
+                {
+                    fridayShift.IsActive = false;
+                    fridayShift.UpdatedAt = DateTime.UtcNow;
+                    _logger.LogInformation("Updated Friday shift to inactive for Dr. John Smith");
+                }
+                
+                // Update Saturday shift to inactive
+                var saturdayShift = await _context.ShiftSchedules
+                    .FirstOrDefaultAsync(s => s.DoctorId == doctorId && s.DayOfWeek == "Saturday");
+                
+                if (saturdayShift != null)
+                {
+                    saturdayShift.IsActive = false;
+                    saturdayShift.UpdatedAt = DateTime.UtcNow;
+                    _logger.LogInformation("Updated Saturday shift to inactive for Dr. John Smith");
+                }
+                
+                // Update Sunday shift to inactive
+                var sundayShift = await _context.ShiftSchedules
+                    .FirstOrDefaultAsync(s => s.DoctorId == doctorId && s.DayOfWeek == "Sunday");
+                
+                if (sundayShift != null)
+                {
+                    sundayShift.IsActive = false;
+                    sundayShift.UpdatedAt = DateTime.UtcNow;
+                    _logger.LogInformation("Updated Sunday shift to inactive for Dr. John Smith");
+                }
+                
+                await _context.SaveChangesAsync();
+                
+                return Ok(new { 
+                    success = true, 
+                    message = "Dr. John Smith's weekend shifts updated successfully!",
+                    updatedShifts = new[] { "Friday", "Saturday", "Sunday" },
+                    doctorId = doctorId.ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating Dr. John Smith's shifts");
+                return StatusCode(500, new { success = false, message = "Error updating shifts", error = ex.Message });
+            }
+        }
+
+        // Helper method to get doctor services
+        private static List<ServiceDto> GetDoctorServices(Guid doctorId)
+        {
+            return new List<ServiceDto> 
+            { 
+                new ServiceDto
+                {
+                    Name = "General Consultation",
+                    Description = "General medical consultation",
+                    DurationMinutes = 30,
+                    Price = 150.00m,
+                    IsActive = true
+                },
+                new ServiceDto
+                {
+                    Name = "Follow-up",
+                    Description = "Follow-up appointment",
+                    DurationMinutes = 20,
+                    Price = 100.00m,
+                    IsActive = true
+                },
+                new ServiceDto
+                {
+                    Name = "Check-up",
+                    Description = "Regular health check-up",
+                    DurationMinutes = 45,
+                    Price = 200.00m,
+                    IsActive = true
+                }
+            };
         }
     }
 }
