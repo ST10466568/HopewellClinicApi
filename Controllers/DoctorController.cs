@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using HopewellClinicApi.Data;
 using HopewellClinicApi.DTOs;
 using HopewellClinicApi.Models;
@@ -88,7 +89,7 @@ namespace HopewellClinicApi.Controllers
                 var patients = await _context.Appointments
                     .Include(a => a.Patient)
                         .ThenInclude(p => p.User)
-                    .Where(a => a.StaffId == doctorId && a.Patient != null && a.Patient.User != null && a.Patient.User != null)
+                    .Where(a => (a.StaffId == doctorId || a.DoctorId == doctorId) && a.Patient != null && a.Patient.User != null)
                     .Select(a => new PatientSummaryDto
                     {
                         Id = a.Patient.Id,
@@ -110,11 +111,28 @@ namespace HopewellClinicApi.Controllers
         }
 
         [HttpGet("{doctorId}/appointments/upcoming")]
-        [Authorize]
-        public async Task<ActionResult<IEnumerable<AppointmentResponse>>> GetUpcomingAppointments(Guid doctorId)
+        [Authorize(Roles = "doctor,admin")]
+        public async Task<ActionResult<PagedResult<AppointmentResponse>>> GetUpcomingAppointments(
+            Guid doctorId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? search = null)
         {
             try
             {
+                // Authorization: Doctor can only see their own appointments
+                var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+                var isAdmin = User.IsInRole("admin");
+                
+                if (!isAdmin && currentUserId != null && Guid.TryParse(currentUserId, out var userId))
+                {
+                    var staff = await _context.Staff.FirstOrDefaultAsync(s => s.UserId == userId);
+                    if (staff == null || staff.Id != doctorId)
+                    {
+                        return StatusCode(403, new { error = "You can only view your own upcoming appointments" });
+                    }
+                }
+
                 // Verify doctor exists
                 var doctor = await _context.Staff.FindAsync(doctorId);
                 if (doctor == null)
@@ -122,16 +140,44 @@ namespace HopewellClinicApi.Controllers
                     return NotFound(new { error = "Doctor not found" });
                 }
 
+                var now = DateTime.Now;
                 var today = DateTime.Today;
-                var appointments = await _context.Appointments
+
+                // Build base query for upcoming confirmed appointments
+                // Check both StaffId and DoctorId to handle appointments that might have either field set
+                var query = _context.Appointments
                     .Include(a => a.Service)
                     .Include(a => a.Patient)
                         .ThenInclude(p => p.User)
                     .Include(a => a.Staff)
                         .ThenInclude(s => s.User)
-                    .Where(a => a.StaffId == doctorId && a.AppointmentDate >= today && a.Status != "cancelled")
+                    .Where(a => (a.StaffId == doctorId || a.DoctorId == doctorId) && 
+                                a.Status == "confirmed" &&
+                                // Appointment date is today or future
+                                (a.AppointmentDate > today || 
+                                 (a.AppointmentDate == today && a.StartTime > TimeOnly.FromDateTime(now))));
+
+                // Apply search filter if provided
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var searchLower = search.ToLower();
+                    query = query.Where(a => 
+                        (a.Patient != null && a.Patient.User != null && 
+                         (a.Patient.User.FirstName.ToLower().Contains(searchLower) ||
+                          a.Patient.User.LastName.ToLower().Contains(searchLower) ||
+                          (a.Patient.User.Email != null && a.Patient.User.Email.ToLower().Contains(searchLower)))) ||
+                        (a.Service != null && a.Service.Name.ToLower().Contains(searchLower)));
+                }
+
+                // Get total count before pagination
+                var totalCount = await query.CountAsync();
+
+                // Apply pagination
+                var appointments = await query
                     .OrderBy(a => a.AppointmentDate)
                     .ThenBy(a => a.StartTime)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
                     .Select(a => new AppointmentResponse
                     {
                         Id = a.Id,
@@ -140,39 +186,55 @@ namespace HopewellClinicApi.Controllers
                         EndTime = a.EndTime,
                         Status = a.Status,
                         Notes = a.Notes,
-                        Service = new ServiceResponse
+                        Service = a.Service != null ? new ServiceResponse
                         {
                             Id = a.Service.Id,
                             Name = a.Service.Name,
                             Description = a.Service.Description,
-                            DurationMinutes = a.Service.DurationMinutes
-                        },
-                        Patient = a.Patient != null && a.Patient.User != null && a.Patient.User != null ? new PatientResponse
+                            DurationMinutes = a.Service.DurationMinutes,
+                            Price = a.Service.Price,
+                            IsActive = a.Service.IsActive,
+                            CreatedAt = a.Service.CreatedAt,
+                            UpdatedAt = a.Service.UpdatedAt
+                        } : null,
+                        Patient = a.Patient != null && a.Patient.User != null ? new PatientResponse
                         {
                             Id = a.Patient.Id,
                             FirstName = a.Patient.User.FirstName,
                             LastName = a.Patient.User.LastName,
-                            Phone = a.Patient.User.PhoneNumber ?? ""
+                            Phone = a.Patient.User.PhoneNumber ?? "",
+                            Email = a.Patient.User.Email
                         } : null,
-                        Staff = a.Staff != null && a.Staff.User != null && a.Staff.User != null ? new StaffResponse
+                        Staff = a.Staff != null && a.Staff.User != null ? new StaffResponse
                         {
                             Id = a.Staff.Id,
                             UserId = a.Staff.UserId,
                             StaffNumber = a.Staff.StaffNumber,
                             FirstName = a.Staff.User.FirstName,
                             LastName = a.Staff.User.LastName,
-                            Role = "staff",
+                            Role = "doctor",
                             Phone = a.Staff.User.PhoneNumber,
                             IsActive = a.Staff.User.IsActive
                         } : null
                     })
                     .ToListAsync();
 
-                return Ok(appointments);
+                var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+                var result = new PagedResult<AppointmentResponse>
+                {
+                    Items = appointments,
+                    TotalCount = totalCount,
+                    Page = page,
+                    Limit = pageSize,
+                    TotalPages = totalPages
+                };
+
+                return Ok(result);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Internal server error" });
+                return StatusCode(500, new { error = "Internal server error", message = ex.Message });
             }
         }
 
@@ -353,23 +415,62 @@ namespace HopewellClinicApi.Controllers
 
         // Appointment Approval System
         [HttpPut("appointments/{appointmentId}/approve")]
+        [Authorize(Roles = "doctor")]
         public async Task<ActionResult> ApproveAppointment(Guid appointmentId, [FromBody] ApproveAppointmentRequest request)
         {
             try
             {
-                var appointment = await _context.Appointments.FindAsync(appointmentId);
+                var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
+                                   User.FindFirst("sub")?.Value;
+                
+                if (string.IsNullOrEmpty(currentUserId) || !Guid.TryParse(currentUserId, out var userId))
+                {
+                    return Unauthorized(new { error = "User ID not found in token" });
+                }
+
+                // Get current doctor's staff record
+                var staff = await _context.Staff
+                    .FirstOrDefaultAsync(s => s.UserId == userId);
+                
+                if (staff == null)
+                {
+                    return StatusCode(403, new { error = "Only doctors can approve appointments" });
+                }
+
+                // Get appointment with related data
+                var appointment = await _context.Appointments
+                    .Include(a => a.Staff)
+                    .FirstOrDefaultAsync(a => a.Id == appointmentId);
+                
                 if (appointment == null)
                 {
                     return NotFound(new { error = "Appointment not found" });
                 }
 
+                // Verify doctor owns this appointment (check both StaffId and DoctorId)
+                var isAssignedToDoctor = appointment.StaffId == staff.Id || 
+                                        (appointment.DoctorId.HasValue && appointment.DoctorId == staff.Id);
+                
+                if (!isAssignedToDoctor)
+                {
+                    return StatusCode(403, new { error = "You can only approve appointments assigned to you" });
+                }
+
+                // If appointment has DoctorId but not StaffId, update StaffId to match
+                if (appointment.DoctorId == staff.Id && appointment.StaffId != staff.Id)
+                {
+                    appointment.StaffId = staff.Id;
+                }
+
                 appointment.ApprovalStatus = ApprovalStatus.Approved;
                 appointment.Status = "confirmed";
                 appointment.ApprovedAt = DateTime.UtcNow;
-                appointment.ApprovedBy = User.Identity?.Name; // Get current user ID
-                if (!string.IsNullOrEmpty(request.Notes))
+                appointment.ApprovedBy = currentUserId;
+                if (!string.IsNullOrEmpty(request?.Notes))
                 {
-                    appointment.Notes = request.Notes;
+                    appointment.Notes = string.IsNullOrEmpty(appointment.Notes) 
+                        ? request.Notes 
+                        : $"{appointment.Notes}\n{request.Notes}";
                 }
                 appointment.UpdatedAt = DateTime.UtcNow;
 
@@ -377,37 +478,85 @@ namespace HopewellClinicApi.Controllers
 
                 return Ok(new { message = "Appointment approved successfully" });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Internal server error" });
+                return StatusCode(500, new { error = "Internal server error", message = ex.Message });
             }
         }
 
         [HttpPut("appointments/{appointmentId}/reject")]
+        [Authorize(Roles = "doctor")]
         public async Task<ActionResult> RejectAppointment(Guid appointmentId, [FromBody] RejectAppointmentRequest request)
         {
             try
             {
-                var appointment = await _context.Appointments.FindAsync(appointmentId);
+                if (request == null || string.IsNullOrEmpty(request.Reason))
+                {
+                    return BadRequest(new { error = "Rejection reason is required" });
+                }
+
+                var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
+                                   User.FindFirst("sub")?.Value;
+                
+                if (string.IsNullOrEmpty(currentUserId) || !Guid.TryParse(currentUserId, out var userId))
+                {
+                    return Unauthorized(new { error = "User ID not found in token" });
+                }
+
+                // Get current doctor's staff record
+                var staff = await _context.Staff
+                    .FirstOrDefaultAsync(s => s.UserId == userId);
+                
+                if (staff == null)
+                {
+                    return StatusCode(403, new { error = "Only doctors can reject appointments" });
+                }
+
+                // Get appointment with related data
+                var appointment = await _context.Appointments
+                    .Include(a => a.Staff)
+                    .FirstOrDefaultAsync(a => a.Id == appointmentId);
+                
                 if (appointment == null)
                 {
                     return NotFound(new { error = "Appointment not found" });
+                }
+
+                // Verify doctor owns this appointment (check both StaffId and DoctorId)
+                var isAssignedToDoctor = appointment.StaffId == staff.Id || 
+                                        (appointment.DoctorId.HasValue && appointment.DoctorId == staff.Id);
+                
+                if (!isAssignedToDoctor)
+                {
+                    return StatusCode(403, new { error = "You can only reject appointments assigned to you" });
+                }
+
+                // If appointment has DoctorId but not StaffId, update StaffId to match
+                if (appointment.DoctorId == staff.Id && appointment.StaffId != staff.Id)
+                {
+                    appointment.StaffId = staff.Id;
                 }
 
                 appointment.ApprovalStatus = ApprovalStatus.Rejected;
                 appointment.Status = "cancelled";
                 appointment.RejectionReason = request.Reason;
                 appointment.ApprovedAt = DateTime.UtcNow;
-                appointment.ApprovedBy = User.Identity?.Name; // Get current user ID
+                appointment.ApprovedBy = currentUserId;
                 appointment.UpdatedAt = DateTime.UtcNow;
+
+                // Add rejection reason to notes if provided
+                var rejectionNote = $"Rejected by doctor: {request.Reason}";
+                appointment.Notes = string.IsNullOrEmpty(appointment.Notes) 
+                    ? rejectionNote 
+                    : $"{appointment.Notes}\n{rejectionNote}";
 
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Appointment rejected successfully" });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Internal server error" });
+                return StatusCode(500, new { error = "Internal server error", message = ex.Message });
             }
         }
 
@@ -424,7 +573,7 @@ namespace HopewellClinicApi.Controllers
                         .ThenInclude(p => p.User)
                     .Include(a => a.Staff)
                         .ThenInclude(s => s.User)
-                    .Where(a => a.StaffId == doctorId)
+                    .Where(a => a.StaffId == doctorId || a.DoctorId == doctorId)
                     .OrderByDescending(a => a.AppointmentDate)
                     .ThenBy(a => a.StartTime)
                     .Select(a => new AppointmentWithApprovalResponse
@@ -490,7 +639,7 @@ namespace HopewellClinicApi.Controllers
                         .ThenInclude(p => p.User)
                     .Include(a => a.Staff)
                         .ThenInclude(s => s.User)
-                    .Where(a => a.StaffId == doctorId && 
+                    .Where(a => (a.StaffId == doctorId || a.DoctorId == doctorId) && 
                                a.AppointmentDate >= startDate && 
                                a.AppointmentDate <= endDate)
                     .OrderBy(a => a.AppointmentDate)

@@ -113,3 +113,5 @@ WHERE TABLE_NAME = 'Notifications' AND COLUMN_NAME = 'StaffId';
 
 You should see one row with `StaffId` column details.
 
+
+

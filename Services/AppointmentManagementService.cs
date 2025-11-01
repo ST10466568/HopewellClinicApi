@@ -234,8 +234,7 @@ namespace HopewellClinicApi.Services
 
                 // Apply pagination
                 var appointments = await query
-                    .OrderByDescending(a => a.AppointmentDate)
-                    .ThenBy(a => a.StartTime)
+                    .OrderByDescending(a => a.CreatedAt)
                     .Skip((request.Page - 1) * request.Limit)
                     .Take(request.Limit)
                     .Select(a => new AppointmentDetailDto

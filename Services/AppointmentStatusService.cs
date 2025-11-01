@@ -12,8 +12,8 @@ namespace HopewellClinicApi.Services
     public interface IAppointmentStatusService
     {
         Task<AppointmentStatusResponse> UpdateAppointmentStatusAsync(Guid appointmentId, UpdateAppointmentStatusRequest request, string userId, string userRole);
-        Task<AppointmentActionResponse> ApproveAppointmentAsync(Guid appointmentId, ApproveAppointmentRequest request, string userId);
-        Task<AppointmentActionResponse> RejectAppointmentAsync(Guid appointmentId, RejectAppointmentRequest request, string userId);
+        Task<AppointmentActionResponse> ApproveAppointmentAsync(Guid appointmentId, ApproveAppointmentRequest request, string userId, string userRole = "admin");
+        Task<AppointmentActionResponse> RejectAppointmentAsync(Guid appointmentId, RejectAppointmentRequest request, string userId, string userRole = "admin");
         Task<bool> CanUserModifyAppointmentAsync(Guid appointmentId, string userId, string userRole);
         Task<List<AppointmentAuditLogEntry>> GetAppointmentAuditLogAsync(Guid appointmentId);
         Task LogAppointmentActionAsync(Guid appointmentId, string action, string? oldStatus, string? newStatus, string? reason, string userId, string? details = null);
@@ -88,15 +88,15 @@ namespace HopewellClinicApi.Services
         /// <summary>
         /// Approves an appointment (sets status to confirmed)
         /// </summary>
-        public async Task<AppointmentActionResponse> ApproveAppointmentAsync(Guid appointmentId, ApproveAppointmentRequest request, string userId)
+        public async Task<AppointmentActionResponse> ApproveAppointmentAsync(Guid appointmentId, ApproveAppointmentRequest request, string userId, string userRole = "admin")
         {
             var statusRequest = new UpdateAppointmentStatusRequest
             {
                 Status = "confirmed",
-                Reason = request.Notes
+                Reason = request?.Notes
             };
 
-            var result = await UpdateAppointmentStatusAsync(appointmentId, statusRequest, userId, "admin");
+            var result = await UpdateAppointmentStatusAsync(appointmentId, statusRequest, userId, userRole);
 
             return new AppointmentActionResponse
             {
@@ -113,7 +113,7 @@ namespace HopewellClinicApi.Services
         /// <summary>
         /// Rejects an appointment (sets status to cancelled with reason)
         /// </summary>
-        public async Task<AppointmentActionResponse> RejectAppointmentAsync(Guid appointmentId, RejectAppointmentRequest request, string userId)
+        public async Task<AppointmentActionResponse> RejectAppointmentAsync(Guid appointmentId, RejectAppointmentRequest request, string userId, string userRole = "admin")
         {
             var statusRequest = new UpdateAppointmentStatusRequest
             {
@@ -121,7 +121,7 @@ namespace HopewellClinicApi.Services
                 Reason = request.Reason
             };
 
-            var result = await UpdateAppointmentStatusAsync(appointmentId, statusRequest, userId, "admin");
+            var result = await UpdateAppointmentStatusAsync(appointmentId, statusRequest, userId, userRole);
 
             // Add additional notes if provided
             if (!string.IsNullOrEmpty(request.AdditionalNotes))
@@ -162,8 +162,24 @@ namespace HopewellClinicApi.Services
             // Doctors can only modify their own appointments
             if (userRole.Equals("doctor", StringComparison.OrdinalIgnoreCase))
             {
+                if (!Guid.TryParse(userId, out var userIdGuid))
+                {
+                    return false;
+                }
+
+                // Find the doctor's staff record
+                var staff = await _context.Staff
+                    .FirstOrDefaultAsync(s => s.UserId == userIdGuid);
+                
+                if (staff == null)
+                {
+                    return false;
+                }
+
+                // Check if appointment is assigned to this doctor
                 var appointment = await _context.Appointments
-                    .FirstOrDefaultAsync(a => a.Id == appointmentId && a.StaffId.ToString() == userId);
+                    .FirstOrDefaultAsync(a => a.Id == appointmentId && a.StaffId == staff.Id);
+                
                 return appointment != null;
             }
 

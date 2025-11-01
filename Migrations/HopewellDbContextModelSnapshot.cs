@@ -64,12 +64,6 @@ namespace HopewellClinicApi.Migrations
                         },
                         new
                         {
-                            Id = new Guid("550e8400-e29b-41d4-a716-446655449003"),
-                            Name = "nurse",
-                            NormalizedName = "NURSE"
-                        },
-                        new
-                        {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655449004"),
                             Name = "patient",
                             NormalizedName = "PATIENT"
@@ -175,8 +169,8 @@ namespace HopewellClinicApi.Migrations
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441001"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "8dc31d06-6e29-444e-b1e9-cb7511f90714",
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3044),
+                            ConcurrencyStamp = "58e2100f-9073-40f7-a286-52be760428c3",
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8578),
                             Email = "nomsa.mandela@hopewell.com",
                             EmailConfirmed = true,
                             FirstName = "Dr. Nomsa",
@@ -189,15 +183,15 @@ namespace HopewellClinicApi.Migrations
                             PhoneNumber = "+27123456789",
                             PhoneNumberConfirmed = true,
                             TwoFactorEnabled = false,
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3047),
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8586),
                             UserName = "nomsa.mandela@hopewell.com"
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441003"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "f5a1367c-37ec-4b8b-aaf8-8d929659aabf",
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3286),
+                            ConcurrencyStamp = "11897c53-24cd-45cf-96bc-d5c06f3ed990",
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8670),
                             Email = "thabo.sithole@hopewell.com",
                             EmailConfirmed = true,
                             FirstName = "Dr. Thabo",
@@ -210,15 +204,15 @@ namespace HopewellClinicApi.Migrations
                             PhoneNumber = "+27123456790",
                             PhoneNumberConfirmed = true,
                             TwoFactorEnabled = false,
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3286),
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8671),
                             UserName = "thabo.sithole@hopewell.com"
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441004"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "e65c15b7-65e6-42b3-8e6c-887606cc7d5e",
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3630),
+                            ConcurrencyStamp = "3b9997f0-1d94-4094-87eb-44b0f79a32fc",
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9116),
                             Email = "john.doe@test.com",
                             EmailConfirmed = true,
                             FirstName = "John",
@@ -231,7 +225,7 @@ namespace HopewellClinicApi.Migrations
                             PhoneNumber = "+27123456791",
                             PhoneNumberConfirmed = true,
                             TwoFactorEnabled = false,
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3631),
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9116),
                             UserName = "john.doe@test.com"
                         });
                 });
@@ -848,52 +842,52 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440000"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3455),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8864),
                             Description = "General medical consultation and examination",
                             DurationMinutes = 30,
                             IsActive = true,
                             Name = "General Consultation",
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3455)
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8864)
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440001"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3466),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8884),
                             Description = "Health services for infants and children",
                             DurationMinutes = 30,
                             IsActive = true,
                             Name = "Pediatrics Consultation",
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3466)
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8885)
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440002"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3470),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8913),
                             Description = "Routine dental examination and cleaning",
                             DurationMinutes = 45,
                             IsActive = true,
                             Name = "Dental Checkup",
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3470)
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8913)
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440003"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3473),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8917),
                             Description = "Physical therapy for rehabilitation",
                             DurationMinutes = 60,
                             IsActive = true,
                             Name = "Physiotherapy Session",
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3473)
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8917)
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655440004"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3476),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8920),
                             Description = "Routine immunizations and boosters",
                             DurationMinutes = 20,
                             IsActive = true,
                             Name = "Vaccination",
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3476)
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8920)
                         });
                 });
 
@@ -982,19 +976,19 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441000"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3519),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8977),
                             IsActive = true,
                             StaffNumber = "DOC001",
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3519),
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8978),
                             UserId = new Guid("550e8400-e29b-41d4-a716-446655441001")
                         },
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655441002"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3527),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8984),
                             IsActive = true,
                             StaffNumber = "DOC002",
-                            UpdatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3528),
+                            UpdatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(8984),
                             UserId = new Guid("550e8400-e29b-41d4-a716-446655441003")
                         });
                 });
@@ -1061,7 +1055,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443101"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3561),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9026),
                             DayOfWeek = 1,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -1073,7 +1067,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443102"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3567),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9034),
                             DayOfWeek = 1,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -1085,7 +1079,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443103"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3571),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9038),
                             DayOfWeek = 1,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),
@@ -1097,7 +1091,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443201"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3575),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9045),
                             DayOfWeek = 2,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -1109,7 +1103,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443202"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3577),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9047),
                             DayOfWeek = 2,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -1121,7 +1115,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443203"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3580),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9050),
                             DayOfWeek = 2,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),
@@ -1133,7 +1127,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443301"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3582),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9052),
                             DayOfWeek = 3,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -1145,7 +1139,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443302"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3588),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9056),
                             DayOfWeek = 3,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -1157,7 +1151,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443303"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3590),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9058),
                             DayOfWeek = 3,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),
@@ -1169,7 +1163,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443401"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3592),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9071),
                             DayOfWeek = 4,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -1181,7 +1175,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443402"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3595),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9073),
                             DayOfWeek = 4,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -1193,7 +1187,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443403"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3597),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9079),
                             DayOfWeek = 4,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),
@@ -1205,7 +1199,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443501"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3599),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9081),
                             DayOfWeek = 5,
                             Duration = 30,
                             EndTime = new TimeOnly(10, 0, 0),
@@ -1217,7 +1211,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443502"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3602),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9084),
                             DayOfWeek = 5,
                             Duration = 30,
                             EndTime = new TimeOnly(11, 0, 0),
@@ -1229,7 +1223,7 @@ namespace HopewellClinicApi.Migrations
                         new
                         {
                             Id = new Guid("550e8400-e29b-41d4-a716-446655443503"),
-                            CreatedAt = new DateTime(2025, 10, 30, 22, 23, 39, 642, DateTimeKind.Utc).AddTicks(3607),
+                            CreatedAt = new DateTime(2025, 11, 1, 8, 37, 24, 46, DateTimeKind.Utc).AddTicks(9086),
                             DayOfWeek = 5,
                             Duration = 30,
                             EndTime = new TimeOnly(12, 0, 0),

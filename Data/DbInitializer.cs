@@ -19,10 +19,6 @@ public static class DbInitializer
         {
             await roleManager.CreateAsync(new ApplicationRole { Name = "doctor", NormalizedName = "DOCTOR" });
         }
-        if (!await roleManager.RoleExistsAsync("nurse"))
-        {
-            await roleManager.CreateAsync(new ApplicationRole { Name = "nurse", NormalizedName = "NURSE" });
-        }
         if (!await roleManager.RoleExistsAsync("patient"))
         {
             await roleManager.CreateAsync(new ApplicationRole { Name = "patient", NormalizedName = "PATIENT" });

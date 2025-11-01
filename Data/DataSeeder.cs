@@ -14,7 +14,6 @@ public static class DataSeeder
         {
             new ApplicationRole { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655449001"), Name = "admin", NormalizedName = "ADMIN" },
             new ApplicationRole { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655449002"), Name = "doctor", NormalizedName = "DOCTOR" },
-            new ApplicationRole { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655449003"), Name = "nurse", NormalizedName = "NURSE" },
             new ApplicationRole { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655449004"), Name = "patient", NormalizedName = "PATIENT" }
         };
         modelBuilder.Entity<ApplicationRole>().HasData(roles);

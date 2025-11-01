@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
+using System.Linq;
+using Microsoft.Extensions.Logging;
 using HopewellClinicApi.Data;
 using HopewellClinicApi.DTOs;
 using HopewellClinicApi.Models;
@@ -19,13 +21,15 @@ namespace HopewellClinicApi.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<ApplicationRole> _roleManager;
         private readonly IAdminDoctorService _adminDoctorService;
+        private readonly ILogger<AdminController> _logger;
 
-        public AdminController(HopewellDbContext context, UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager, IAdminDoctorService adminDoctorService)
+        public AdminController(HopewellDbContext context, UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager, IAdminDoctorService adminDoctorService, ILogger<AdminController> logger)
         {
             _context = context;
             _userManager = userManager;
             _roleManager = roleManager;
             _adminDoctorService = adminDoctorService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -396,13 +400,47 @@ namespace HopewellClinicApi.Controllers
         }
 
         [HttpPut("users/{userId}")]
-        public async Task<ActionResult<UpdateUserResponse>> UpdateUser(Guid userId, [FromBody] UpdateUserRequest request)
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<UpdateUserResponse>> UpdateUser(Guid userId, [FromBody] UpdateUserRequest? request)
         {
             try
             {
+                _logger.LogInformation("=== UpdateUser START ===");
+                _logger.LogInformation("UpdateUser called with userId: {UserId}", userId);
+                _logger.LogInformation("Request is null: {IsNull}", request == null);
+                
+                // Validate request
+                if (request == null)
+                {
+                    _logger.LogWarning("Request body is null for userId: {UserId}", userId);
+                    return BadRequest(new UpdateUserResponse 
+                    { 
+                        Message = "Request body is required"
+                    });
+                }
+
                 // Log the incoming request for debugging
-                Console.WriteLine($"UpdateUser called with userId: {userId}");
-                Console.WriteLine($"Request data: {System.Text.Json.JsonSerializer.Serialize(request)}");
+                try
+                {
+                    _logger.LogInformation("Request data: {RequestData}", System.Text.Json.JsonSerializer.Serialize(request));
+                }
+                catch (Exception serializationEx)
+                {
+                    _logger.LogWarning(serializationEx, "Failed to serialize request: {Message}", serializationEx.Message);
+                }
+                
+                // Log model state
+                if (!ModelState.IsValid)
+                {
+                    _logger.LogWarning("ModelState is invalid");
+                    foreach (var error in ModelState)
+                    {
+                        foreach (var err in error.Value?.Errors ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.ModelBinding.ModelError>())
+                        {
+                            _logger.LogWarning("ModelState Error - Key: {Key}, Error: {Error}", error.Key, err.ErrorMessage);
+                        }
+                    }
+                }
 
                 // Try to find user by User ID first
                 var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -410,7 +448,7 @@ namespace HopewellClinicApi.Controllers
                 // If not found, try to find user through Staff ID
                 if (user == null)
                 {
-                    Console.WriteLine($"User not found with User ID: {userId}, trying Staff ID lookup...");
+                    _logger.LogWarning("User not found with User ID: {UserId}, trying Staff ID lookup...", userId);
                     var staff = await _context.Staff
                         .Include(s => s.User)
                         .FirstOrDefaultAsync(s => s.Id == userId);
@@ -418,14 +456,14 @@ namespace HopewellClinicApi.Controllers
                     if (staff != null && staff.User != null)
                     {
                         user = staff.User;
-                        Console.WriteLine($"Found user through Staff ID: {staff.User.FirstName} {staff.User.LastName}");
+                        _logger.LogInformation("Found user through Staff ID: {FirstName} {LastName}", staff.User.FirstName, staff.User.LastName);
                     }
                 }
                 
                 // If still not found, try to find user through Patient ID
                 if (user == null)
                 {
-                    Console.WriteLine($"User not found with Staff ID: {userId}, trying Patient ID lookup...");
+                    _logger.LogWarning("User not found with Staff ID: {UserId}, trying Patient ID lookup...", userId);
                     var patient = await _context.Patients
                         .Include(p => p.User)
                         .FirstOrDefaultAsync(p => p.Id == userId);
@@ -433,13 +471,13 @@ namespace HopewellClinicApi.Controllers
                     if (patient != null && patient.User != null)
                     {
                         user = patient.User;
-                        Console.WriteLine($"Found user through Patient ID: {patient.User.FirstName} {patient.User.LastName}");
+                        _logger.LogInformation("Found user through Patient ID: {FirstName} {LastName}", patient.User.FirstName, patient.User.LastName);
                     }
                 }
 
                 if (user == null)
                 {
-                    Console.WriteLine($"User not found with any ID type: {userId}");
+                    _logger.LogWarning("User not found with any ID type: {UserId}", userId);
                     return NotFound(new UpdateUserResponse 
                     { 
                         Message = $"User not found with ID: {userId} (tried User ID, Staff ID, and Patient ID)",
@@ -462,7 +500,7 @@ namespace HopewellClinicApi.Controllers
                     });
                 }
 
-                Console.WriteLine($"Found user: {user.FirstName} {user.LastName} ({user.Email})");
+                _logger.LogInformation("Found user: {FirstName} {LastName} ({Email})", user.FirstName, user.LastName, user.Email);
 
                 // Validate model state
                 if (!ModelState.IsValid)
@@ -496,11 +534,18 @@ namespace HopewellClinicApi.Controllers
                     }
                 }
 
-                // Update basic user information
-                user.FirstName = request.FirstName;
-                user.LastName = request.LastName;
-                user.Email = request.Email;
-                user.UserName = request.Email; // Update username to match email
+                // Update basic user information (only update if provided)
+                if (!string.IsNullOrEmpty(request.FirstName))
+                    user.FirstName = request.FirstName;
+                
+                if (!string.IsNullOrEmpty(request.LastName))
+                    user.LastName = request.LastName;
+                
+                if (!string.IsNullOrEmpty(request.Email))
+                {
+                    user.Email = request.Email;
+                    user.UserName = request.Email; // Update username to match email
+                }
                 
                 // Handle optional fields - accept empty strings and null
                 if (request.Phone != null)
@@ -544,15 +589,24 @@ namespace HopewellClinicApi.Controllers
                     user.IsActive = request.IsActive.Value;
                 }
 
+                // Ensure SecurityStamp is set (required for Identity)
+                if (string.IsNullOrEmpty(user.SecurityStamp))
+                {
+                    await _userManager.UpdateSecurityStampAsync(user);
+                }
+
                 // Update user in database
                 var updateResult = await _userManager.UpdateAsync(user);
                 if (!updateResult.Succeeded)
                 {
+                    _logger.LogError("Failed to update user. Errors: {Errors}", string.Join(", ", updateResult.Errors.Select(e => e.Description)));
                     return BadRequest(new UpdateUserResponse 
                     { 
                         Message = "Failed to update user: " + string.Join(", ", updateResult.Errors.Select(e => e.Description))
                     });
                 }
+
+                _logger.LogInformation("Successfully updated user. IsActive: {IsActive}", user.IsActive);
 
                 // Update associated Patient/Staff record if exists
                 var associatedPatient = await _context.Patients.FirstOrDefaultAsync(p => p.UserId == user.Id);
@@ -580,6 +634,17 @@ namespace HopewellClinicApi.Controllers
                     
                     associatedPatient.UpdatedAt = DateTime.UtcNow;
                     await _context.SaveChangesAsync();
+                    _logger.LogInformation("Successfully updated associated patient record");
+                }
+
+                // Update associated Staff record if exists
+                var associatedStaff = await _context.Staff.FirstOrDefaultAsync(s => s.UserId == user.Id);
+                if (associatedStaff != null && request.IsActive.HasValue)
+                {
+                    associatedStaff.IsActive = request.IsActive.Value;
+                    associatedStaff.UpdatedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Successfully updated associated staff record");
                 }
 
                 // Update role if provided
@@ -591,6 +656,7 @@ namespace HopewellClinicApi.Controllers
                         await _userManager.RemoveFromRolesAsync(user, currentRoles);
                     }
                     await _userManager.AddToRoleAsync(user, request.Role);
+                    _logger.LogInformation("Successfully updated user role to: {Role}", request.Role);
                 }
 
                 // Get updated user roles
@@ -620,20 +686,39 @@ namespace HopewellClinicApi.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Exception in UpdateUser: {Message}", ex.Message);
                 return StatusCode(500, new UpdateUserResponse 
                 { 
-                    Message = "Internal server error: " + ex.Message 
+                    Message = "Internal server error: " + ex.Message,
+                    User = new UserApiResponse
+                    {
+                        Id = Guid.Empty,
+                        Email = "",
+                        FirstName = "",
+                        LastName = "",
+                        Role = "",
+                        IsActive = false,
+                        CreatedAt = "",
+                        UpdatedAt = ""
+                    }
                 });
             }
         }
 
         [HttpPut("users/{userId}/status")]
+        [Authorize(Roles = "admin")]
         public async Task<ActionResult> UpdateUserStatus(Guid userId, [FromBody] UpdateStaffStatusRequest request)
         {
             try
             {
-                Console.WriteLine($"UpdateUserStatus called with userId: {userId}");
-                Console.WriteLine($"Request data: {System.Text.Json.JsonSerializer.Serialize(request)}");
+                _logger.LogInformation("UpdateUserStatus called with userId: {UserId}", userId);
+                _logger.LogInformation("Request data: {RequestData}", System.Text.Json.JsonSerializer.Serialize(request));
+
+                // Validate request
+                if (request == null)
+                {
+                    return BadRequest(new { error = "Request body is required" });
+                }
 
                 // Try to find user by User ID first
                 var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -641,7 +726,7 @@ namespace HopewellClinicApi.Controllers
                 // If not found, try to find user through Staff ID
                 if (user == null)
                 {
-                    Console.WriteLine($"User not found with User ID: {userId}, trying Staff ID lookup...");
+                    _logger.LogWarning("User not found with User ID: {UserId}, trying Staff ID lookup...", userId);
                     var staff = await _context.Staff
                         .Include(s => s.User)
                         .FirstOrDefaultAsync(s => s.Id == userId);
@@ -649,14 +734,14 @@ namespace HopewellClinicApi.Controllers
                     if (staff != null && staff.User != null)
                     {
                         user = staff.User;
-                        Console.WriteLine($"Found user through Staff ID: {staff.User.FirstName} {staff.User.LastName}");
+                        _logger.LogInformation("Found user through Staff ID: {FirstName} {LastName}", staff.User.FirstName, staff.User.LastName);
                     }
                 }
                 
                 // If still not found, try to find user through Patient ID
                 if (user == null)
                 {
-                    Console.WriteLine($"User not found with Staff ID: {userId}, trying Patient ID lookup...");
+                    _logger.LogWarning("User not found with Staff ID: {UserId}, trying Patient ID lookup...", userId);
                     var patient = await _context.Patients
                         .Include(p => p.User)
                         .FirstOrDefaultAsync(p => p.Id == userId);
@@ -664,34 +749,80 @@ namespace HopewellClinicApi.Controllers
                     if (patient != null && patient.User != null)
                     {
                         user = patient.User;
-                        Console.WriteLine($"Found user through Patient ID: {patient.User.FirstName} {patient.User.LastName}");
+                        _logger.LogInformation("Found user through Patient ID: {FirstName} {LastName}", patient.User.FirstName, patient.User.LastName);
                     }
                 }
 
                 if (user == null)
                 {
-                    Console.WriteLine($"User not found with any ID type: {userId}");
+                    _logger.LogWarning("User not found with any ID type: {UserId}", userId);
                     return NotFound(new { 
                         error = $"User not found with ID: {userId} (tried User ID, Staff ID, and Patient ID)" 
                     });
                 }
 
-                Console.WriteLine($"Found user: {user.FirstName} {user.LastName} ({user.Email})");
+                // Ensure user is tracked by DbContext (attach if not tracked)
+                if (_context.Entry(user).State == EntityState.Detached)
+                {
+                    _context.Users.Attach(user);
+                }
 
+                _logger.LogInformation("Found user: {FirstName} {LastName} ({Email})", user.FirstName, user.LastName, user.Email);
+                _logger.LogInformation("Current IsActive: {CurrentIsActive}, Requested IsActive: {RequestedIsActive}", user.IsActive, request.IsActive);
+
+                // Update IsActive status
                 user.IsActive = request.IsActive;
                 user.UpdatedAt = DateTime.UtcNow;
 
+                // Ensure SecurityStamp is set (required for Identity)
+                if (string.IsNullOrEmpty(user.SecurityStamp))
+                {
+                    await _userManager.UpdateSecurityStampAsync(user);
+                }
+
+                // Mark entity as modified in DbContext to ensure changes are tracked
+                _context.Entry(user).Property(u => u.IsActive).IsModified = true;
+                _context.Entry(user).Property(u => u.UpdatedAt).IsModified = true;
+
+                // Save changes using UserManager first (for Identity updates)
                 var result = await _userManager.UpdateAsync(user);
                 if (!result.Succeeded)
                 {
-                    return BadRequest(new { error = "Failed to update user status" });
+                    _logger.LogError("Failed to update user status via UserManager. Errors: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+                    return BadRequest(new { 
+                        error = "Failed to update user status",
+                        details = result.Errors.Select(e => e.Description).ToList()
+                    });
                 }
 
-                return Ok(new { message = "User status updated successfully" });
+                // Explicitly save changes to DbContext to ensure persistence
+                var saveResult = await _context.SaveChangesAsync();
+                _logger.LogInformation("DbContext.SaveChangesAsync result: {ChangesSaved} changes saved", saveResult);
+
+                // Verify the change was persisted by reloading from database
+                await _context.Entry(user).ReloadAsync();
+                
+                _logger.LogInformation("Successfully updated user status. IsActive after reload: {IsActive}", user.IsActive);
+
+                // Get user roles for response
+                var userRoles = await _userManager.GetRolesAsync(user);
+                var displayRole = userRoles.FirstOrDefault() ?? "user";
+
+                return Ok(new 
+                { 
+                    id = user.Id,
+                    email = user.Email ?? "",
+                    firstName = user.FirstName,
+                    lastName = user.LastName,
+                    isActive = user.IsActive,
+                    role = displayRole,
+                    message = user.IsActive ? "User activated successfully" : "User deactivated successfully"
+                });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Internal server error" });
+                _logger.LogError(ex, "Exception in UpdateUserStatus: {Message}", ex.Message);
+                return StatusCode(500, new { error = "Internal server error", message = ex.Message });
             }
         }
 
@@ -753,8 +884,6 @@ namespace HopewellClinicApi.Controllers
                             displayRole = "admin";
                         else if (userRoles.Contains("doctor"))
                             displayRole = "doctor";
-                        else if (userRoles.Contains("nurse"))
-                            displayRole = "nurse";
                         else if (userRoles.Contains("staff"))
                             displayRole = "staff";
                         else if (userRoles.Contains("patient"))
@@ -809,8 +938,6 @@ namespace HopewellClinicApi.Controllers
                             displayRole = "admin";
                         else if (userRoles.Contains("doctor"))
                             displayRole = "doctor";
-                        else if (userRoles.Contains("nurse"))
-                            displayRole = "nurse";
                         else if (userRoles.Contains("staff"))
                             displayRole = "staff";
                         else if (userRoles.Contains("patient"))
@@ -928,8 +1055,6 @@ namespace HopewellClinicApi.Controllers
                         displayRole = "admin";
                     else if (userRoles.Contains("doctor"))
                         displayRole = "doctor";
-                    else if (userRoles.Contains("nurse"))
-                        displayRole = "nurse";
                     else if (userRoles.Contains("staff"))
                         displayRole = "staff";
                     else if (userRoles.Contains("patient"))
@@ -1062,8 +1187,6 @@ namespace HopewellClinicApi.Controllers
                         displayRole = "admin";
                     else if (userRoles.Contains("doctor"))
                         displayRole = "doctor";
-                    else if (userRoles.Contains("nurse"))
-                        displayRole = "nurse";
                     else if (userRoles.Contains("staff"))
                         displayRole = "staff";
                     else if (userRoles.Contains("patient"))
@@ -1128,8 +1251,6 @@ namespace HopewellClinicApi.Controllers
                         displayRole = "admin";
                     else if (userRoles.Contains("doctor"))
                         displayRole = "doctor";
-                    else if (userRoles.Contains("nurse"))
-                        displayRole = "nurse";
                     else if (userRoles.Contains("staff"))
                         displayRole = "staff";
                     else if (userRoles.Contains("patient"))
@@ -1785,11 +1906,17 @@ namespace HopewellClinicApi.Controllers
         }
 
         [HttpPut("doctors/{doctorId}/shifts")]
-        [AllowAnonymous] // Temporarily remove authorization to test
+        [Authorize(Roles = "admin")]
         public async Task<ActionResult<object>> UpdateDoctorShifts(Guid doctorId, [FromBody] UpdateShiftScheduleRequest request)
         {
             try
             {
+                // Validate request
+                if (request == null || request.Shifts == null || !request.Shifts.Any())
+                {
+                    return BadRequest(new { error = "INVALID_REQUEST", message = "Shifts data is required" });
+                }
+
                 // Get doctor info
                 var doctor = await _context.Staff
                     .Include(s => s.User)
@@ -1805,18 +1932,56 @@ namespace HopewellClinicApi.Controllers
                     .Where(s => s.DoctorId == doctorId)
                     .ToListAsync();
 
+                var updatedShifts = new List<object>();
+
                 // Update or create shifts
                 foreach (var shiftInfo in request.Shifts)
                 {
+                    // Validate shift data
+                    if (string.IsNullOrWhiteSpace(shiftInfo.DayOfWeek))
+                    {
+                        return BadRequest(new { error = "INVALID_SHIFT_DATA", message = "DayOfWeek is required for all shifts" });
+                    }
+
+                    if (string.IsNullOrWhiteSpace(shiftInfo.StartTime) || string.IsNullOrWhiteSpace(shiftInfo.EndTime))
+                    {
+                        return BadRequest(new { error = "INVALID_SHIFT_DATA", message = "StartTime and EndTime are required for all shifts" });
+                    }
+
+                    // Parse times - handle both "HH:mm" and "HH:mm:ss" formats
+                    if (!TimeSpan.TryParse(shiftInfo.StartTime, out var startTime))
+                    {
+                        return BadRequest(new { error = "INVALID_TIME_FORMAT", message = $"Invalid start time format: {shiftInfo.StartTime}. Use HH:mm or HH:mm:ss format" });
+                    }
+
+                    if (!TimeSpan.TryParse(shiftInfo.EndTime, out var endTime))
+                    {
+                        return BadRequest(new { error = "INVALID_TIME_FORMAT", message = $"Invalid end time format: {shiftInfo.EndTime}. Use HH:mm or HH:mm:ss format" });
+                    }
+
+                    if (endTime <= startTime)
+                    {
+                        return BadRequest(new { error = "INVALID_TIME_RANGE", message = $"End time must be after start time for {shiftInfo.DayOfWeek}" });
+                    }
+
                     var existingShift = existingShifts.FirstOrDefault(s => s.DayOfWeek == shiftInfo.DayOfWeek);
                     
                     if (existingShift != null)
                     {
                         // Update existing shift
-                        existingShift.StartTime = TimeSpan.Parse(shiftInfo.StartTime);
-                        existingShift.EndTime = TimeSpan.Parse(shiftInfo.EndTime);
+                        existingShift.StartTime = startTime;
+                        existingShift.EndTime = endTime;
                         existingShift.IsActive = shiftInfo.IsActive;
                         existingShift.UpdatedAt = DateTime.UtcNow;
+
+                        updatedShifts.Add(new
+                        {
+                            id = existingShift.Id,
+                            dayOfWeek = existingShift.DayOfWeek,
+                            startTime = existingShift.StartTime.ToString(@"hh\:mm"),
+                            endTime = existingShift.EndTime.ToString(@"hh\:mm"),
+                            isActive = existingShift.IsActive
+                        });
                     }
                     else
                     {
@@ -1826,23 +1991,41 @@ namespace HopewellClinicApi.Controllers
                             Id = Guid.NewGuid(),
                             DoctorId = doctorId,
                             DayOfWeek = shiftInfo.DayOfWeek,
-                            StartTime = TimeSpan.Parse(shiftInfo.StartTime),
-                            EndTime = TimeSpan.Parse(shiftInfo.EndTime),
+                            StartTime = startTime,
+                            EndTime = endTime,
                             IsActive = shiftInfo.IsActive,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
                         _context.ShiftSchedules.Add(newShift);
+
+                        updatedShifts.Add(new
+                        {
+                            id = newShift.Id,
+                            dayOfWeek = newShift.DayOfWeek,
+                            startTime = newShift.StartTime.ToString(@"hh\:mm"),
+                            endTime = newShift.EndTime.ToString(@"hh\:mm"),
+                            isActive = newShift.IsActive
+                        });
                     }
                 }
 
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Shift schedule updated successfully" });
+                return Ok(new 
+                { 
+                    doctorId = doctorId,
+                    message = "Shift schedule updated successfully",
+                    shifts = updatedShifts
+                });
+            }
+            catch (FormatException ex)
+            {
+                return BadRequest(new { error = "INVALID_TIME_FORMAT", message = "Invalid time format. Use HH:mm or HH:mm:ss format" });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = "INTERNAL_ERROR", message = ex.Message, stackTrace = ex.StackTrace });
+                return StatusCode(500, new { error = "INTERNAL_ERROR", message = ex.Message });
             }
         }
     }

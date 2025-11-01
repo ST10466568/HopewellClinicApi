@@ -864,6 +864,7 @@ namespace HopewellClinicApi.Controllers
 
         /// <summary>
         /// Get all notifications for a staff member
+        /// Supports both Staff.Id and User.Id lookups
         /// </summary>
         [HttpGet("staff/{staffId}")]
         [AllowAnonymous]
@@ -871,24 +872,74 @@ namespace HopewellClinicApi.Controllers
         {
             try
             {
+                _logger.LogInformation("Getting notifications for staffId: {StaffId}", staffId);
+
+                // First, try to find if staffId is a Staff.Id or User.Id
                 var staff = await _context.Staff
                     .Include(s => s.User)
                     .FirstOrDefaultAsync(s => s.Id == staffId);
-
-                if (staff == null)
+                
+                Guid? userId = null;
+                
+                if (staff != null)
                 {
+                    userId = staff.UserId;
+                    _logger.LogInformation("Found staff by Staff.Id: {StaffId}, UserId: {UserId}", staffId, userId);
+                }
+                else
+                {
+                    // If not found as Staff.Id, check if it's a User.Id
+                    var user = await _context.Users.FindAsync(staffId);
+                    if (user != null)
+                    {
+                        // Try to find staff by UserId
+                        staff = await _context.Staff
+                            .Include(s => s.User)
+                            .FirstOrDefaultAsync(s => s.UserId == user.Id);
+                        
+                        if (staff != null)
+                        {
+                            userId = staff.UserId;
+                            _logger.LogInformation("Found staff by User.Id: {UserId}, StaffId: {StaffId}", user.Id, staff.Id);
+                        }
+                        else
+                        {
+                            // If no staff record found, use the user ID directly
+                            userId = user.Id;
+                            _logger.LogInformation("Using User.Id directly: {UserId}", userId);
+                        }
+                    }
+                }
+
+                if (!userId.HasValue)
+                {
+                    _logger.LogWarning("Staff/User not found for staffId: {StaffId}", staffId);
                     return NotFound(new { error = "Staff member not found" });
                 }
 
+                // Query notifications where PatientId matches the UserId (for staff recipients)
                 var notifications = await _context.Notifications
-                    .Include(n => n.Patient)
-                    .Include(n => n.Appointment)
-                        .ThenInclude(a => a!.Service)
-                    .Include(n => n.Replies)
-                    .Include(n => n.Sender)
-                    .Where(n => n.PatientId == staff.UserId)
+                    .Where(n => n.PatientId == userId)
                     .OrderByDescending(n => n.CreatedAt)
-                    .Select(n => new EnhancedNotificationDto
+                    .ToListAsync();
+
+                _logger.LogInformation("Found {Count} notifications for userId: {UserId}", notifications.Count, userId);
+
+                // Manually map to DTO with null-safe checks
+                var notificationDtos = notifications.Select(n =>
+                {
+                    // Load related entities if needed
+                    var patient = n.PatientId.HasValue ? _context.Patients
+                        .Include(p => p.User)
+                        .FirstOrDefault(p => p.UserId == n.PatientId) : null;
+                    
+                    var appointment = n.AppointmentId.HasValue ? _context.Appointments
+                        .Include(a => a.Service)
+                        .FirstOrDefault(a => a.Id == n.AppointmentId) : null;
+                    
+                    var sender = n.SenderId.HasValue ? _context.Users.FindAsync(n.SenderId.Value).Result : null;
+
+                    return new EnhancedNotificationDto
                     {
                         Id = n.Id,
                         Type = n.Type.ToString(),
@@ -896,33 +947,21 @@ namespace HopewellClinicApi.Controllers
                         SentAt = n.SentAt,
                         EmailSubject = n.EmailSubject,
                         EmailContent = n.EmailContent,
-                        AppointmentDate = n.Appointment != null ? n.Appointment.AppointmentDate : null,
-                        AppointmentTime = n.Appointment != null ? n.Appointment.StartTime.ToString(@"hh\:mm") : null,
-                        ServiceName = n.ServiceName ?? (n.Appointment != null && n.Appointment.Service != null ? n.Appointment.Service.Name : null),
+                        AppointmentDate = appointment?.AppointmentDate,
+                        AppointmentTime = appointment?.StartTime.ToString(@"hh\:mm"),
+                        ServiceName = n.ServiceName ?? appointment?.Service?.Name,
                         PatientId = n.PatientId,
-                        PatientName = n.Patient != null ? $"{n.Patient.FirstName} {n.Patient.LastName}" : null,
+                        PatientName = patient?.User != null ? $"{patient.User.FirstName} {patient.User.LastName}" : null,
                         SenderId = n.SenderId,
                         SenderName = n.SenderName,
                         SenderRole = n.SenderRole,
                         IsRead = n.IsRead,
                         ThreadId = n.ThreadId,
-                        Replies = n.Replies.Select(r => new NotificationReplyResponse
-                        {
-                            Id = r.Id,
-                            NotificationId = r.NotificationId,
-                            ThreadId = r.ThreadId,
-                            SenderId = r.SenderId,
-                            SenderName = r.SenderName,
-                            SenderRole = r.SenderRole,
-                            Content = r.Content,
-                            SentAt = r.SentAt,
-                            IsRead = r.IsRead
-                        }).ToList(),
                         CreatedAt = n.CreatedAt
-                    })
-                    .ToListAsync();
+                    };
+                }).ToList();
 
-                return Ok(notifications);
+                return Ok(notificationDtos);
             }
             catch (Exception ex)
             {
@@ -1031,11 +1070,11 @@ namespace HopewellClinicApi.Controllers
                     return BadRequest(new { error = "Invalid request format", details = errors });
                 }
 
-                // Validate sender role (must be doctor, nurse, or admin)
-                var validSenderRoles = new[] { "doctor", "nurse", "admin" };
+                // Validate sender role (must be doctor or admin)
+                var validSenderRoles = new[] { "doctor", "admin" };
                 if (!validSenderRoles.Contains(request.SenderRole.ToLower()))
                 {
-                    return BadRequest(new { error = "Only doctors, nurses, and admins can send messages" });
+                    return BadRequest(new { error = "Only doctors and admins can send messages" });
                 }
 
                 // Validate recipient exists based on recipientRole

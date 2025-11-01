@@ -50,14 +50,9 @@ namespace HopewellClinicApi.Attributes
         public AuthorizeDoctorAttribute() : base("doctor") { }
     }
 
-    public class AuthorizeNurseAttribute : AuthorizeRoleAttribute
-    {
-        public AuthorizeNurseAttribute() : base("nurse") { }
-    }
-
     public class AuthorizeStaffAttribute : AuthorizeRoleAttribute
     {
-        public AuthorizeStaffAttribute() : base("doctor", "nurse", "admin") { }
+        public AuthorizeStaffAttribute() : base("doctor", "admin") { }
     }
 
     public class AuthorizePatientAttribute : AuthorizeRoleAttribute
@@ -67,7 +62,7 @@ namespace HopewellClinicApi.Attributes
 
     public class AuthorizePatientOrStaffAttribute : AuthorizeRoleAttribute
     {
-        public AuthorizePatientOrStaffAttribute() : base("patient", "doctor", "nurse", "admin") { }
+        public AuthorizePatientOrStaffAttribute() : base("patient", "doctor", "admin") { }
     }
 }
 

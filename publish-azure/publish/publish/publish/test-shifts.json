@@ -1,0 +1,16 @@
+{
+  "shifts": [
+    {
+      "dayOfWeek": "Monday",
+      "startTime": "08:00",
+      "endTime": "16:00",
+      "isActive": true
+    },
+    {
+      "dayOfWeek": "Tuesday", 
+      "startTime": "08:00",
+      "endTime": "16:00",
+      "isActive": true
+    }
+  ]
+}

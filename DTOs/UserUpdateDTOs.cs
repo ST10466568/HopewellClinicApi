@@ -4,15 +4,12 @@ namespace HopewellClinicApi.DTOs
 {
     public class UpdateUserRequest
     {
-        [Required(ErrorMessage = "First name is required")]
-        public string FirstName { get; set; } = string.Empty;
+        // Made optional to allow partial updates
+        public string? FirstName { get; set; }
 
-        [Required(ErrorMessage = "Last name is required")]
-        public string LastName { get; set; } = string.Empty;
+        public string? LastName { get; set; }
 
-        [Required(ErrorMessage = "Email is required")]
-        [EmailAddress(ErrorMessage = "Invalid email format")]
-        public string Email { get; set; } = string.Empty;
+        public string? Email { get; set; }
 
         // Optional fields - accept empty strings without validation errors
         public string? Phone { get; set; }

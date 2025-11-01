@@ -7,6 +7,8 @@ using HopewellClinicApi.Data;
 using HopewellClinicApi.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using System.Security.Claims;
+using System.Linq;
 
 namespace HopewellClinicApi.Controllers
 {
@@ -893,11 +895,67 @@ namespace HopewellClinicApi.Controllers
         /// Update doctor shift schedule
         /// </summary>
         [HttpPut("doctor/{doctorId}/shifts")]
-        [AllowAnonymous]
+        [JwtAuthorize]
         public async Task<ActionResult<ApiResponse<object>>> UpdateDoctorShiftSchedule(Guid doctorId, [FromBody] UpdateShiftScheduleRequest request)
         {
             try
             {
+                // Validate request
+                if (request == null || request.Shifts == null || !request.Shifts.Any())
+                {
+                    return BadRequest(new ApiResponse<object>
+                    {
+                        Success = false,
+                        Error = "INVALID_REQUEST",
+                        Message = "Shifts data is required"
+                    });
+                }
+
+                // Get current user info for authorization check
+                var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                {
+                    return Unauthorized(new ApiResponse<object>
+                    {
+                        Success = false,
+                        Error = "UNAUTHORIZED",
+                        Message = "Invalid user token"
+                    });
+                }
+
+                // Get user roles
+                var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+                var isAdmin = userRoles.Contains("admin");
+                var isDoctor = userRoles.Contains("doctor");
+
+                // Authorization: Admin can update any doctor's schedule, doctors can only update their own
+                if (!isAdmin && isDoctor)
+                {
+                    // Doctor can only update their own schedule
+                    var staff = await _context.Staff.FirstOrDefaultAsync(s => s.UserId == userId);
+                    if (staff == null || staff.Id != doctorId)
+                    {
+                        _logger.LogWarning(
+                            "Unauthorized shift update attempt - UserId: {UserId}, DoctorId: {DoctorId}, StaffId: {StaffId}",
+                            userId, doctorId, staff?.Id);
+                        return StatusCode(403, new ApiResponse<object>
+                        {
+                            Success = false,
+                            Error = "FORBIDDEN",
+                            Message = "Doctors can only update their own shift schedule"
+                        });
+                    }
+                }
+                else if (!isAdmin && !isDoctor)
+                {
+                    return StatusCode(403, new ApiResponse<object>
+                    {
+                        Success = false,
+                        Error = "FORBIDDEN",
+                        Message = "Only admins and doctors can update shift schedules"
+                    });
+                }
+
                 // Get doctor info
                 var doctor = await _context.Staff
                     .Include(s => s.User)
@@ -918,18 +976,81 @@ namespace HopewellClinicApi.Controllers
                     .Where(s => s.DoctorId == doctorId)
                     .ToListAsync();
 
+                var updatedShifts = new List<object>();
+
                 // Update or create shifts
                 foreach (var shiftInfo in request.Shifts)
                 {
+                    // Validate shift data
+                    if (string.IsNullOrWhiteSpace(shiftInfo.DayOfWeek))
+                    {
+                        return BadRequest(new ApiResponse<object>
+                        {
+                            Success = false,
+                            Error = "INVALID_SHIFT_DATA",
+                            Message = "DayOfWeek is required for all shifts"
+                        });
+                    }
+
+                    if (string.IsNullOrWhiteSpace(shiftInfo.StartTime) || string.IsNullOrWhiteSpace(shiftInfo.EndTime))
+                    {
+                        return BadRequest(new ApiResponse<object>
+                        {
+                            Success = false,
+                            Error = "INVALID_SHIFT_DATA",
+                            Message = "StartTime and EndTime are required for all shifts"
+                        });
+                    }
+
+                    // Parse times - handle both "HH:mm" and "HH:mm:ss" formats
+                    if (!TimeSpan.TryParse(shiftInfo.StartTime, out var startTime))
+                    {
+                        return BadRequest(new ApiResponse<object>
+                        {
+                            Success = false,
+                            Error = "INVALID_TIME_FORMAT",
+                            Message = $"Invalid start time format: {shiftInfo.StartTime}. Use HH:mm or HH:mm:ss format"
+                        });
+                    }
+
+                    if (!TimeSpan.TryParse(shiftInfo.EndTime, out var endTime))
+                    {
+                        return BadRequest(new ApiResponse<object>
+                        {
+                            Success = false,
+                            Error = "INVALID_TIME_FORMAT",
+                            Message = $"Invalid end time format: {shiftInfo.EndTime}. Use HH:mm or HH:mm:ss format"
+                        });
+                    }
+
+                    if (endTime <= startTime)
+                    {
+                        return BadRequest(new ApiResponse<object>
+                        {
+                            Success = false,
+                            Error = "INVALID_TIME_RANGE",
+                            Message = $"End time must be after start time for {shiftInfo.DayOfWeek}"
+                        });
+                    }
+
                     var existingShift = existingShifts.FirstOrDefault(s => s.DayOfWeek == shiftInfo.DayOfWeek);
                     
                     if (existingShift != null)
                     {
                         // Update existing shift
-                        existingShift.StartTime = TimeSpan.Parse(shiftInfo.StartTime);
-                        existingShift.EndTime = TimeSpan.Parse(shiftInfo.EndTime);
+                        existingShift.StartTime = startTime;
+                        existingShift.EndTime = endTime;
                         existingShift.IsActive = shiftInfo.IsActive;
                         existingShift.UpdatedAt = DateTime.UtcNow;
+
+                        updatedShifts.Add(new
+                        {
+                            id = existingShift.Id,
+                            dayOfWeek = existingShift.DayOfWeek,
+                            startTime = existingShift.StartTime.ToString(@"hh\:mm"),
+                            endTime = existingShift.EndTime.ToString(@"hh\:mm"),
+                            isActive = existingShift.IsActive
+                        });
                     }
                     else
                     {
@@ -939,13 +1060,22 @@ namespace HopewellClinicApi.Controllers
                             Id = Guid.NewGuid(),
                             DoctorId = doctorId,
                             DayOfWeek = shiftInfo.DayOfWeek,
-                            StartTime = TimeSpan.Parse(shiftInfo.StartTime),
-                            EndTime = TimeSpan.Parse(shiftInfo.EndTime),
+                            StartTime = startTime,
+                            EndTime = endTime,
                             IsActive = shiftInfo.IsActive,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
                         _context.ShiftSchedules.Add(newShift);
+
+                        updatedShifts.Add(new
+                        {
+                            id = newShift.Id,
+                            dayOfWeek = newShift.DayOfWeek,
+                            startTime = newShift.StartTime.ToString(@"hh\:mm"),
+                            endTime = newShift.EndTime.ToString(@"hh\:mm"),
+                            isActive = newShift.IsActive
+                        });
                     }
                 }
 
@@ -954,7 +1084,22 @@ namespace HopewellClinicApi.Controllers
                 return Ok(new ApiResponse<object>
                 {
                     Success = true,
-                    Data = new { message = "Shift schedule updated successfully" }
+                    Data = new 
+                    { 
+                        doctorId = doctorId,
+                        message = "Shift schedule updated successfully",
+                        shifts = updatedShifts
+                    }
+                });
+            }
+            catch (FormatException ex)
+            {
+                _logger.LogError(ex, "Error parsing shift schedule times for doctor: {DoctorId}", doctorId);
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Error = "INVALID_TIME_FORMAT",
+                    Message = "Invalid time format. Use HH:mm or HH:mm:ss format"
                 });
             }
             catch (Exception ex)

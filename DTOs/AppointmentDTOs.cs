@@ -30,6 +30,8 @@ namespace HopewellClinicApi.DTOs
         public TimeOnly? EndTime { get; set; }
         public string? Notes { get; set; }
         public string? Status { get; set; }
+        public Guid? ServiceId { get; set; }
+        public Guid? StaffId { get; set; }
     }
 
     public class AssignStaffRequest

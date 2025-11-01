@@ -218,8 +218,6 @@ namespace HopewellClinicApi.Controllers
                 var totalDoctors = await _context.Staff
                     .Include(s => s.User)
                     .CountAsync(s => s.User.IsActive);
-                var totalNurses = await _context.Users
-                    .CountAsync(u => u.IsActive);
                 var totalServices = await _context.Services.CountAsync();
                 var activeServices = await _context.Services.CountAsync(s => s.IsActive);
 
@@ -252,7 +250,7 @@ namespace HopewellClinicApi.Controllers
                     TotalUsers = totalUsers,
                     TotalPatients = totalPatients,
                     TotalDoctors = totalDoctors,
-                    TotalNurses = totalNurses,
+                    TotalNurses = 0,
                     TotalServices = totalServices,
                     ActiveServices = activeServices,
                     TotalAppointmentsToday = totalAppointmentsToday,

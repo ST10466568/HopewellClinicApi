@@ -7,6 +7,7 @@ using HopewellClinicApi.DTOs;
 using HopewellClinicApi.Attributes;
 using HopewellClinicApi.Services;
 using System.Security.Claims;
+using System.Linq;
 
 namespace HopewellClinicApi.Controllers
 {
@@ -17,12 +18,76 @@ namespace HopewellClinicApi.Controllers
         private readonly HopewellDbContext _context;
         private readonly IAppointmentManagementService _appointmentManagementService;
         private readonly IAppointmentStatusService _appointmentStatusService;
+        private readonly ILogger<AppointmentsController> _logger;
 
-        public AppointmentsController(HopewellDbContext context, IAppointmentManagementService appointmentManagementService, IAppointmentStatusService appointmentStatusService)
+        public AppointmentsController(
+            HopewellDbContext context, 
+            IAppointmentManagementService appointmentManagementService, 
+            IAppointmentStatusService appointmentStatusService,
+            ILogger<AppointmentsController> logger)
         {
             _context = context;
             _appointmentManagementService = appointmentManagementService;
             _appointmentStatusService = appointmentStatusService;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Diagnostic endpoint to check appointment assignment details
+        /// </summary>
+        [HttpGet("{id}/diagnostic")]
+        [JwtAuthorize]
+        public async Task<ActionResult> GetAppointmentDiagnostic(Guid id)
+        {
+            try
+            {
+                var appointment = await _context.Appointments
+                    .Include(a => a.Staff)
+                    .FirstOrDefaultAsync(a => a.Id == id);
+
+                if (appointment == null)
+                {
+                    return NotFound(new { error = "Appointment not found" });
+                }
+
+                var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                Guid? userId = null;
+                if (!string.IsNullOrEmpty(userIdClaim) && Guid.TryParse(userIdClaim, out var parsedUserId))
+                {
+                    userId = parsedUserId;
+                }
+
+                var staff = userId.HasValue ? await _context.Staff.FirstOrDefaultAsync(s => s.UserId == userId.Value) : null;
+
+                return Ok(new
+                {
+                    appointment = new
+                    {
+                        id = appointment.Id,
+                        staffId = appointment.StaffId?.ToString() ?? "null",
+                        doctorId = appointment.DoctorId?.ToString() ?? "null",
+                        status = appointment.Status,
+                        appointmentDate = appointment.AppointmentDate,
+                        startTime = appointment.StartTime.ToString()
+                    },
+                    currentUser = new
+                    {
+                        userId = userId?.ToString() ?? "null",
+                        staffId = staff?.Id.ToString() ?? "null",
+                        staffUserId = staff?.UserId.ToString() ?? "null"
+                    },
+                    matches = new
+                    {
+                        staffIdMatch = staff != null && appointment.StaffId == staff.Id,
+                        doctorIdMatch = staff != null && appointment.DoctorId.HasValue && appointment.DoctorId == staff.Id,
+                        isAssigned = staff != null && (appointment.StaffId == staff.Id || (appointment.DoctorId.HasValue && appointment.DoctorId == staff.Id))
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+            }
         }
 
         /// <summary>
@@ -248,7 +313,7 @@ namespace HopewellClinicApi.Controllers
                         .ThenInclude(p => p.User)
                     .Include(a => a.Staff)
                         .ThenInclude(s => s.User)
-                    .OrderBy(a => a.StartTime)
+                    .OrderByDescending(a => a.CreatedAt)
                     .ToListAsync();
 
                 var appointmentResults = appointments.Select(a => new
@@ -693,6 +758,7 @@ namespace HopewellClinicApi.Controllers
                         .ThenInclude(p => p.User)
                     .Include(a => a.Staff)
                         .ThenInclude(s => s.User)
+                    .OrderByDescending(a => a.CreatedAt)
                     .Select(a => new AppointmentResponse
                     {
                         Id = a.Id,
@@ -803,19 +869,39 @@ namespace HopewellClinicApi.Controllers
         /// This is the route the frontend expects: GET /api/Appointments
         /// </summary>
         [HttpGet]
-        [AllowAnonymous]
+        [JwtAuthorize]
         public async Task<ActionResult<IEnumerable<object>>> GetAppointmentsAnonymous()
         {
             try
             {
-                Console.WriteLine($"GET /api/Appointments - Starting method execution (Anonymous)");
+                Console.WriteLine($"GET /api/Appointments - Starting method execution");
                 
-                var appointments = await _context.Appointments
+                // Get current user info for filtering
+                var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+                var isAdmin = userRoles.Contains("admin");
+                var isDoctor = userRoles.Contains("doctor");
+                
+                var query = _context.Appointments
                     .Include(a => a.Service)
                     .Include(a => a.Patient)
                         .ThenInclude(p => p.User)
                     .Include(a => a.Staff)
                         .ThenInclude(s => s.User)
+                    .AsQueryable();
+                
+                // If user is a doctor (not admin), filter to only their appointments
+                if (!isAdmin && isDoctor && !string.IsNullOrEmpty(userIdClaim) && Guid.TryParse(userIdClaim, out var userId))
+                {
+                    var staff = await _context.Staff.FirstOrDefaultAsync(s => s.UserId == userId);
+                    if (staff != null)
+                    {
+                        // Filter to appointments assigned to this doctor via StaffId OR DoctorId
+                        query = query.Where(a => a.StaffId == staff.Id || a.DoctorId == staff.Id);
+                    }
+                }
+                
+                var appointments = await query
                     .OrderByDescending(a => a.CreatedAt)
                     .ToListAsync();
 
@@ -903,27 +989,93 @@ namespace HopewellClinicApi.Controllers
             }
         }
 
-        [HttpDelete("{id}")]
+        /// <summary>
+        /// Cancel appointment (does not delete, just changes status)
+        /// </summary>
+        [HttpPut("{id}/cancel")]
+        [JwtAuthorize]
         public async Task<ActionResult> CancelAppointment(Guid id)
         {
             try
             {
-                var appointment = await _context.Appointments.FindAsync(id);
+                var appointment = await _context.Appointments
+                    .Include(a => a.Staff)
+                    .Include(a => a.Patient)
+                    .FirstOrDefaultAsync(a => a.Id == id);
+                
                 if (appointment == null)
                 {
                     return NotFound(new { error = "Appointment not found" });
                 }
 
+                // Get current user for authorization
+                var currentUserId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var isAdmin = User.IsInRole("admin");
+                var isDoctor = User.IsInRole("doctor");
+
+                // Authorization: Doctor can only cancel their own appointments
+                if (!isAdmin && isDoctor && currentUserId != null && Guid.TryParse(currentUserId, out var userId))
+                {
+                    var staff = await _context.Staff.FirstOrDefaultAsync(s => s.UserId == userId);
+                    if (staff == null)
+                    {
+                        return StatusCode(403, new { error = "Doctor staff record not found" });
+                    }
+
+                    // Check if appointment is assigned to this doctor via StaffId OR DoctorId
+                    var isAssignedToDoctor = appointment.StaffId == staff.Id || 
+                                            (appointment.DoctorId.HasValue && appointment.DoctorId == staff.Id);
+                    
+                    if (!isAssignedToDoctor)
+                    {
+                        return StatusCode(403, new { error = "You can only cancel appointments assigned to you" });
+                    }
+
+                    // If appointment has DoctorId but not StaffId, update StaffId to match
+                    if (appointment.DoctorId == staff.Id && appointment.StaffId != staff.Id)
+                    {
+                        appointment.StaffId = staff.Id;
+                    }
+                }
+
+                // Validate appointment status
+                if (appointment.Status != "confirmed")
+                {
+                    return BadRequest(new { error = "Only confirmed appointments can be cancelled" });
+                }
+
+                // Validate appointment is in the future (optional: allow cancelling today's appointments)
+                var now = DateTime.Now;
+                var appointmentDateTime = appointment.AppointmentDate.Date.Add(appointment.StartTime.ToTimeSpan());
+                
+                // Allow cancellation if appointment is today or in the future
+                // For past appointments, still allow but return a warning
+                if (appointmentDateTime < now)
+                {
+                    // Optionally: return error for past appointments
+                    // return BadRequest(new { error = "Cannot cancel past appointments" });
+                }
+
                 appointment.Status = "cancelled";
                 appointment.UpdatedAt = DateTime.UtcNow;
 
+                // Add cancellation note
+                var cancelNote = $"Cancelled by {(isAdmin ? "admin" : "doctor")} on {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}";
+                appointment.Notes = string.IsNullOrEmpty(appointment.Notes) 
+                    ? cancelNote 
+                    : $"{appointment.Notes}\n{cancelNote}";
+
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Appointment cancelled successfully" });
+                return Ok(new { 
+                    message = "Appointment cancelled successfully",
+                    id = appointment.Id,
+                    status = appointment.Status
+                });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Internal server error" });
+                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
             }
         }
 
@@ -1010,6 +1162,7 @@ namespace HopewellClinicApi.Controllers
                         .ThenInclude(p => p.User)
                     .Include(a => a.Staff)
                         .ThenInclude(s => s.User)
+                    .OrderByDescending(a => a.CreatedAt)
                     .Select(a => new AppointmentResponse
                     {
                         Id = a.Id,
@@ -1058,15 +1211,270 @@ namespace HopewellClinicApi.Controllers
         /// Update appointment - Frontend compatible endpoint
         /// </summary>
         [HttpPut("{id}")]
-        [AllowAnonymous]
+        [JwtAuthorize]
         public async Task<ActionResult> UpdateAppointmentFrontend(Guid id, [FromBody] UpdateAppointmentRequest request)
         {
             try
             {
-                var appointment = await _context.Appointments.FindAsync(id);
+                _logger.LogInformation(
+                    "UpdateAppointmentFrontend START - AppointmentId: {AppointmentId}, " +
+                    "RequestDate: {RequestDate}, RequestStartTime: {RequestStartTime}, " +
+                    "RequestEndTime: {RequestEndTime}, RequestNotes: {RequestNotes}",
+                    id,
+                    request.AppointmentDate?.ToString("yyyy-MM-dd") ?? "null",
+                    request.StartTime?.ToString("HH:mm:ss") ?? "null",
+                    request.EndTime?.ToString("HH:mm:ss") ?? "null",
+                    string.IsNullOrEmpty(request.Notes) ? "null" : request.Notes);
+                
+                var appointment = await _context.Appointments
+                    .Include(a => a.Patient)
+                    .Include(a => a.Staff)
+                    .Include(a => a.Service)
+                    .FirstOrDefaultAsync(a => a.Id == id);
+
                 if (appointment == null)
                 {
+                    _logger.LogWarning("UpdateAppointmentFrontend - Appointment not found: {AppointmentId}", id);
                     return NotFound(new { error = "Appointment not found" });
+                }
+                
+                _logger.LogInformation(
+                    "Appointment FOUND - AppointmentId: {AppointmentId}, " +
+                    "CurrentDate: {CurrentDate}, CurrentStartTime: {CurrentStartTime}, " +
+                    "CurrentEndTime: {CurrentEndTime}, Status: {Status}, " +
+                    "StaffId: {StaffId}, DoctorId: {DoctorId}, " +
+                    "AppointmentDate Type: {AppointmentDateType}, StartTime Type: {StartTimeType}",
+                    id,
+                    appointment.AppointmentDate.ToString("yyyy-MM-dd"),
+                    appointment.StartTime.ToString("HH:mm:ss"),
+                    appointment.EndTime.ToString("HH:mm:ss"),
+                    appointment.Status,
+                    appointment.StaffId?.ToString() ?? "null",
+                    appointment.DoctorId?.ToString() ?? "null",
+                    appointment.AppointmentDate.GetType().Name,
+                    appointment.StartTime.GetType().Name);
+
+                // Get current user ID for authorization check
+                var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                {
+                    return Unauthorized(new { error = "Invalid user token" });
+                }
+
+                // Authorization: Patients can only update their own appointments, doctors can update appointments assigned to them
+                var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+                var isAdmin = userRoles.Contains("admin");
+                var isDoctor = userRoles.Contains("doctor");
+                
+                // Check if user is patient and owns this appointment
+                if (!isAdmin && !isDoctor)
+                {
+                    var patient = await _context.Patients.FirstOrDefaultAsync(p => p.UserId == userId);
+                    if (patient == null || appointment.PatientId != patient.Id)
+                    {
+                        return StatusCode(403, new { error = "You can only update your own appointments" });
+                    }
+                }
+                
+                // Check if user is doctor and this appointment is assigned to them
+                if (!isAdmin && isDoctor)
+                {
+                    var staff = await _context.Staff.FirstOrDefaultAsync(s => s.UserId == userId);
+                    if (staff == null)
+                    {
+                        return StatusCode(403, new { error = "Doctor staff record not found" });
+                    }
+
+                    // Check if appointment is assigned to this doctor via StaffId OR DoctorId
+                    var staffIdMatch = appointment.StaffId == staff.Id;
+                    var doctorIdMatch = appointment.DoctorId.HasValue && appointment.DoctorId == staff.Id;
+                    var isAssignedToDoctor = staffIdMatch || doctorIdMatch;
+                    
+                    if (!isAssignedToDoctor)
+                    {
+                        return StatusCode(403, new { 
+                            error = "You can only update appointments assigned to you",
+                            details = new {
+                                doctorStaffId = staff.Id.ToString(),
+                                appointmentStaffId = appointment.StaffId?.ToString() ?? "null",
+                                appointmentDoctorId = appointment.DoctorId?.ToString() ?? "null",
+                                staffIdMatch = staffIdMatch,
+                                doctorIdMatch = doctorIdMatch
+                            }
+                        });
+                    }
+
+                    // If appointment has DoctorId but not StaffId, update StaffId to match
+                    if (appointment.DoctorId == staff.Id && appointment.StaffId != staff.Id)
+                    {
+                        appointment.StaffId = staff.Id;
+                    }
+
+                    // Validate that appointment is confirmed and in the future
+                    if (appointment.Status != "confirmed")
+                    {
+                        _logger.LogWarning(
+                            "Update rejected - Appointment not confirmed. AppointmentId: {AppointmentId}, Status: {Status}",
+                            id, appointment.Status);
+                        return BadRequest(new { error = "Only confirmed appointments can be updated" });
+                    }
+
+                    // Check if current appointment date/time is in the future
+                    // IMPORTANT: AppointmentDate is stored as DateTime but we only care about the date part
+                    // StartTime is stored as TimeOnly (time component only)
+                    // We need to combine them correctly, considering timezone
+                    var now = DateTime.Now;
+                    var nowUtc = DateTime.UtcNow;
+                    
+                    // Get the date part (ensuring we get just the date, ignoring time component)
+                    var appointmentDateValue = appointment.AppointmentDate;
+                    var appointmentDate = new DateTime(
+                        appointmentDateValue.Year,
+                        appointmentDateValue.Month,
+                        appointmentDateValue.Day,
+                        0, 0, 0, 0,
+                        DateTimeKind.Unspecified);
+                    
+                    // Combine date with time
+                    var appointmentTime = appointment.StartTime;
+                    var appointmentDateTime = appointmentDate
+                        .AddHours(appointmentTime.Hour)
+                        .AddMinutes(appointmentTime.Minute)
+                        .AddSeconds(appointmentTime.Second);
+                    
+                    // Log raw values for debugging
+                    _logger.LogInformation(
+                        "Raw Values - AppointmentId: {AppointmentId}, " +
+                        "Raw AppointmentDate: {RawAppointmentDate}, " +
+                        "Raw AppointmentDate Kind: {AppointmentDateKind}, " +
+                        "Raw StartTime: {RawStartTime}, " +
+                        "Processed AppointmentDate: {ProcessedDate}, " +
+                        "Processed AppointmentDateTime: {ProcessedDateTime}",
+                        id,
+                        appointment.AppointmentDate.ToString("yyyy-MM-dd HH:mm:ss"),
+                        appointment.AppointmentDate.Kind.ToString(),
+                        appointment.StartTime.ToString("HH:mm:ss"),
+                        appointmentDate.ToString("yyyy-MM-dd HH:mm:ss"),
+                        appointmentDateTime.ToString("yyyy-MM-dd HH:mm:ss"));
+                    
+                    // Detailed logging for debugging
+                    _logger.LogInformation(
+                        "Date/Time Validation - AppointmentId: {AppointmentId}, " +
+                        "AppointmentDate: {AppointmentDate}, " +
+                        "AppointmentTime: {AppointmentTime}, " +
+                        "Combined DateTime: {AppointmentDateTime}, " +
+                        "Current DateTime (Local): {Now}, " +
+                        "Current DateTime (UTC): {NowUtc}, " +
+                        "TimeZone: {TimeZone}, " +
+                        "Is Future: {IsFuture}, " +
+                        "Comparison Result: {Comparison}",
+                        id,
+                        appointmentDate.ToString("yyyy-MM-dd"),
+                        appointmentTime.ToString("HH:mm:ss"),
+                        appointmentDateTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                        now.ToString("yyyy-MM-dd HH:mm:ss"),
+                        nowUtc.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+                        TimeZoneInfo.Local.Id,
+                        appointmentDateTime > now,
+                        appointmentDateTime <= now ? "PAST" : "FUTURE");
+                    
+                    // Compare with current date/time, allowing some buffer (e.g., appointments today but time hasn't passed yet)
+                    if (appointmentDateTime <= now)
+                    {
+                        _logger.LogWarning(
+                            "Update rejected - Appointment is in the past. AppointmentId: {AppointmentId}, " +
+                            "AppointmentDateTime: {AppointmentDateTime}, CurrentDateTime: {CurrentDateTime}, " +
+                            "Difference: {Difference}",
+                            id,
+                            appointmentDateTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                            now.ToString("yyyy-MM-dd HH:mm:ss"),
+                            (now - appointmentDateTime).ToString(@"d\.hh\:mm\:ss"));
+                        
+                        return BadRequest(new { 
+                            error = "Cannot update past appointments. Only future appointments can be edited.",
+                            details = new {
+                                appointmentDate = appointmentDate.ToString("yyyy-MM-dd"),
+                                appointmentTime = appointmentTime.ToString("HH:mm:ss"),
+                                appointmentDateTime = appointmentDateTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                                currentDateTime = now.ToString("yyyy-MM-dd HH:mm:ss"),
+                                currentDateTimeUtc = nowUtc.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+                                timeZone = TimeZoneInfo.Local.Id,
+                                isFuture = appointmentDateTime > now,
+                                differenceHours = (now - appointmentDateTime).TotalHours,
+                                rawAppointmentDate = appointment.AppointmentDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                                rawAppointmentTime = appointment.StartTime.ToString()
+                            }
+                        });
+                    }
+                    
+                    _logger.LogInformation(
+                        "Date/Time Validation PASSED - AppointmentId: {AppointmentId}, " +
+                        "AppointmentDateTime: {AppointmentDateTime} is in the future",
+                        id, appointmentDateTime.ToString("yyyy-MM-dd HH:mm:ss"));
+                }
+
+                // Validate new date/time if being updated (for doctors only)
+                if ((request.AppointmentDate.HasValue || request.StartTime.HasValue) && isDoctor && !isAdmin)
+                {
+                    var newDate = request.AppointmentDate ?? appointment.AppointmentDate;
+                    var newStartTime = request.StartTime ?? appointment.StartTime;
+                    var originalDate = appointment.AppointmentDate;
+                    var originalTime = appointment.StartTime;
+                    
+                    var newDateTime = newDate.Date.Add(newStartTime.ToTimeSpan());
+                    var now = DateTime.Now;
+                    var nowUtc = DateTime.UtcNow;
+
+                    _logger.LogInformation(
+                        "New Date/Time Validation - AppointmentId: {AppointmentId}, " +
+                        "OriginalDate: {OriginalDate}, OriginalTime: {OriginalTime}, " +
+                        "NewDate: {NewDate}, NewTime: {NewTime}, " +
+                        "NewDateTime: {NewDateTime}, CurrentDateTime: {CurrentDateTime}, " +
+                        "CurrentDateTimeUTC: {CurrentDateTimeUtc}, TimeZone: {TimeZone}, " +
+                        "Is Future: {IsFuture}",
+                        id,
+                        originalDate.ToString("yyyy-MM-dd"),
+                        originalTime.ToString("HH:mm:ss"),
+                        newDate.Date.ToString("yyyy-MM-dd"),
+                        newStartTime.ToString("HH:mm:ss"),
+                        newDateTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                        now.ToString("yyyy-MM-dd HH:mm:ss"),
+                        nowUtc.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+                        TimeZoneInfo.Local.Id,
+                        newDateTime > now);
+
+                    if (newDateTime <= now)
+                    {
+                        _logger.LogWarning(
+                            "Update rejected - New appointment date/time is in the past. AppointmentId: {AppointmentId}, " +
+                            "NewDateTime: {NewDateTime}, CurrentDateTime: {CurrentDateTime}, " +
+                            "Difference: {Difference}",
+                            id,
+                            newDateTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                            now.ToString("yyyy-MM-dd HH:mm:ss"),
+                            (now - newDateTime).ToString(@"d\.hh\:mm\:ss"));
+                        
+                        return BadRequest(new { 
+                            error = "New appointment date/time must be in the future",
+                            details = new {
+                                originalDate = originalDate.ToString("yyyy-MM-dd"),
+                                originalTime = originalTime.ToString("HH:mm:ss"),
+                                newDate = newDate.Date.ToString("yyyy-MM-dd"),
+                                newTime = newStartTime.ToString("HH:mm:ss"),
+                                newDateTime = newDateTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                                currentDateTime = now.ToString("yyyy-MM-dd HH:mm:ss"),
+                                currentDateTimeUtc = nowUtc.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+                                timeZone = TimeZoneInfo.Local.Id,
+                                isFuture = newDateTime > now,
+                                differenceHours = (now - newDateTime).TotalHours
+                            }
+                        });
+                    }
+                    
+                    _logger.LogInformation(
+                        "New Date/Time Validation PASSED - AppointmentId: {AppointmentId}, " +
+                        "NewDateTime: {NewDateTime} is in the future",
+                        id, newDateTime.ToString("yyyy-MM-dd HH:mm:ss"));
                 }
 
                 // Update appointment fields
@@ -1081,10 +1489,89 @@ namespace HopewellClinicApi.Controllers
                 if (request.Notes != null)
                     appointment.Notes = request.Notes;
 
+                // Update ServiceId if provided
+                if (request.ServiceId.HasValue)
+                {
+                    var service = await _context.Services.FindAsync(request.ServiceId.Value);
+                    if (service == null)
+                    {
+                        return BadRequest(new { error = "Service not found" });
+                    }
+                    appointment.ServiceId = request.ServiceId.Value;
+                }
+
+                // Update StaffId if provided
+                if (request.StaffId.HasValue)
+                {
+                    var staff = await _context.Staff.FindAsync(request.StaffId.Value);
+                    if (staff == null)
+                    {
+                        return BadRequest(new { error = "Staff member not found" });
+                    }
+                    
+                    // Validate staff availability at the specified time if date/time changed
+                    if (request.AppointmentDate.HasValue || request.StartTime.HasValue || request.EndTime.HasValue)
+                    {
+                        var appointmentDate = request.AppointmentDate ?? appointment.AppointmentDate;
+                        var startTime = request.StartTime ?? appointment.StartTime;
+                        var endTime = request.EndTime ?? appointment.EndTime;
+
+                        // Check for time conflicts with the assigned staff member
+                        var conflictingAppointment = await _context.Appointments
+                            .Where(a => a.Id != id &&
+                                       a.AppointmentDate == appointmentDate &&
+                                       a.StaffId == request.StaffId.Value &&
+                                       a.Status != "cancelled" &&
+                                       ((a.StartTime <= startTime && a.EndTime > startTime) ||
+                                        (a.StartTime < endTime && a.EndTime >= endTime) ||
+                                        (a.StartTime >= startTime && a.EndTime <= endTime)))
+                            .FirstOrDefaultAsync();
+
+                        if (conflictingAppointment != null)
+                        {
+                            return BadRequest(new { error = "Staff member is not available at this time" });
+                        }
+                    }
+                    
+                    appointment.StaffId = request.StaffId.Value;
+                }
+
                 appointment.UpdatedAt = DateTime.UtcNow;
 
-                await _context.SaveChangesAsync();
-                return Ok(new { message = "Appointment updated successfully" });
+                // CRITICAL: Save changes to database with error handling
+                try
+                {
+                    var changesSaved = await _context.SaveChangesAsync();
+                    Console.WriteLine($"Appointment update saved successfully. Rows affected: {changesSaved}");
+                    
+                    // Reload appointment to verify changes were persisted
+                    await _context.Entry(appointment).ReloadAsync();
+                    Console.WriteLine($"Verified appointment after save - Status: {appointment.Status}, StaffId: {appointment.StaffId}, ServiceId: {appointment.ServiceId}");
+                }
+                catch (Exception dbEx)
+                {
+                    Console.WriteLine($"Database save error: {dbEx.Message}");
+                    Console.WriteLine($"Inner exception: {dbEx.InnerException?.Message}");
+                    return StatusCode(500, new { 
+                        error = "Failed to save appointment changes",
+                        message = dbEx.Message,
+                        details = dbEx.InnerException?.Message
+                    });
+                }
+                
+                // Return updated appointment data
+                return Ok(new { 
+                    id = appointment.Id,
+                    appointmentDate = appointment.AppointmentDate.ToString("yyyy-MM-dd"),
+                    startTime = appointment.StartTime.ToString("HH:mm:ss"),
+                    endTime = appointment.EndTime.ToString("HH:mm:ss"),
+                    notes = appointment.Notes,
+                    status = appointment.Status,
+                    serviceId = appointment.ServiceId,
+                    staffId = appointment.StaffId,
+                    patientId = appointment.PatientId,
+                    message = "Appointment updated successfully"
+                });
             }
             catch (Exception ex)
             {
@@ -1093,27 +1580,63 @@ namespace HopewellClinicApi.Controllers
         }
 
         /// <summary>
-        /// Delete appointment - Frontend compatible endpoint
+        /// Delete appointment - Admin/Authorized users only
         /// </summary>
         [HttpDelete("{id}")]
-        [AllowAnonymous]
-        public async Task<ActionResult> DeleteAppointmentFrontend(Guid id)
+        [JwtAuthorize]
+        public async Task<ActionResult> DeleteAppointment(Guid id)
         {
             try
             {
-                var appointment = await _context.Appointments.FindAsync(id);
+                // Get current user for authorization check
+                var currentUserId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var isAdmin = User.IsInRole("admin");
+                
+                var appointment = await _context.Appointments
+                    .Include(a => a.Patient)
+                    .Include(a => a.Staff)
+                    .FirstOrDefaultAsync(a => a.Id == id);
+                
                 if (appointment == null)
                 {
                     return NotFound(new { error = "Appointment not found" });
                 }
 
+                // Check authorization: Admin can delete any, users can only delete their own
+                if (!isAdmin && currentUserId != null && Guid.TryParse(currentUserId, out var userId))
+                {
+                    // Check if user is the patient or staff member
+                    var isPatient = appointment.Patient?.UserId == userId;
+                    var isStaff = appointment.Staff?.UserId == userId;
+                    
+                    if (!isPatient && !isStaff)
+                    {
+                        return StatusCode(403, new { error = "Forbidden", message = "You can only delete your own appointments" });
+                    }
+                }
+
+                // Remove the appointment
                 _context.Appointments.Remove(appointment);
                 await _context.SaveChangesAsync();
+                
                 return Ok(new { message = "Appointment deleted successfully" });
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx)
+            {
+                // Handle foreign key constraint violations
+                return StatusCode(500, new { 
+                    error = "Cannot delete appointment", 
+                    details = "This appointment may have related records that prevent deletion",
+                    message = dbEx.InnerException?.Message ?? dbEx.Message
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+                return StatusCode(500, new { 
+                    error = "Internal server error", 
+                    details = ex.Message,
+                    type = ex.GetType().Name
+                });
             }
         }
 
@@ -1307,6 +1830,7 @@ namespace HopewellClinicApi.Controllers
                         .ThenInclude(p => p.User)
                     .Include(a => a.Staff)
                         .ThenInclude(s => s.User)
+                    .OrderByDescending(a => a.CreatedAt)
                     .Select(a => new AppointmentResponse
                     {
                         Id = a.Id,
@@ -1341,7 +1865,6 @@ namespace HopewellClinicApi.Controllers
                             IsActive = a.Staff.User.IsActive
                         } : null
                     })
-                    .OrderBy(a => a.StartTime)
                     .ToListAsync();
 
                 return Ok(appointments);
@@ -1352,10 +1875,10 @@ namespace HopewellClinicApi.Controllers
             }
         }
 
-        // NURSE DASHBOARD ENDPOINTS
+        // WALK-IN APPOINTMENT ENDPOINT (Admin/Doctor only)
 
         [HttpPost("walkin")]
-        [AuthorizeNurse]
+        [Authorize(Roles = "admin,doctor")]
         public async Task<ActionResult<WalkInAppointmentResponse>> CreateWalkInAppointment([FromBody] WalkInAppointmentDto dto)
         {
             try
@@ -1474,71 +1997,7 @@ namespace HopewellClinicApi.Controllers
             }
         }
 
-        [HttpPut("{id}/approve-for-doctor")]
-        [AuthorizeNurse]
-        public async Task<ActionResult<NurseApprovalResponse>> ApproveForDoctor(Guid id, [FromBody] DoctorApprovalDto dto)
-        {
-            try
-            {
-                var appointment = await _context.Appointments.FindAsync(id);
-                if (appointment == null)
-                {
-                    return NotFound(new { error = "Appointment not found" });
-                }
-
-                // Validate doctor exists
-                var doctor = await _context.Staff.FindAsync(dto.DoctorId);
-                if (doctor == null)
-                {
-                    return BadRequest(new { error = "Doctor not found" });
-                }
-
-                // Check for time conflicts with the assigned doctor
-                var conflictingAppointment = await _context.Appointments
-                    .Where(a => a.Id != id &&
-                               a.AppointmentDate == appointment.AppointmentDate &&
-                               a.StaffId == dto.DoctorId &&
-                               a.Status != "cancelled" &&
-                               ((a.StartTime <= appointment.StartTime && a.EndTime > appointment.StartTime) ||
-                                (a.StartTime < appointment.EndTime && a.EndTime >= appointment.EndTime) ||
-                                (a.StartTime >= appointment.StartTime && a.EndTime <= appointment.EndTime)))
-                    .FirstOrDefaultAsync();
-
-                if (conflictingAppointment != null)
-                {
-                    return BadRequest(new { error = "Doctor is not available at this time" });
-                }
-
-                // Update appointment with nurse approval
-                appointment.StaffId = dto.DoctorId;
-                appointment.Status = "confirmed";
-                appointment.ApprovalStatus = ApprovalStatus.Approved;
-                appointment.ApprovedByNurseId = User.Identity?.Name; // Get current nurse ID
-                appointment.NurseApprovalDate = DateTime.UtcNow;
-                appointment.ApprovedAt = DateTime.UtcNow;
-                appointment.ApprovedBy = dto.DoctorId.ToString();
-                if (!string.IsNullOrEmpty(dto.ApprovalNotes))
-                {
-                    appointment.ApprovalNotes = dto.ApprovalNotes;
-                }
-                appointment.UpdatedAt = DateTime.UtcNow;
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new NurseApprovalResponse
-                {
-                    Message = "Appointment approved and assigned to doctor successfully",
-                    AppointmentId = appointment.Id,
-                    Status = appointment.Status
-                });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, new { error = "Internal server error" });
-            }
-        }
-
-        /// <summary>
+/// <summary>
         /// Get available time slots by doctor - Frontend compatible endpoint
         /// </summary>
         [HttpGet("available-slots-by-doctor")]
@@ -2048,10 +2507,12 @@ namespace HopewellClinicApi.Controllers
         /// <summary>
         /// Update appointment - FRONTEND COMPATIBLE ENDPOINT
         /// This is the route the frontend expects: PUT /api/Appointments/{id}
+        /// NOTE: This endpoint is disabled due to route conflict with UpdateAppointmentFrontend above.
+        /// The UpdateAppointmentFrontend endpoint handles all the same functionality.
         /// </summary>
-        [HttpPut("{id}")]
-        [JwtAuthorize]
-        public async Task<ActionResult> UpdateAppointmentFrontendCompatible(Guid id, [FromBody] UpdateAppointmentRequest request)
+        // [HttpPut("{id}")]
+        // [JwtAuthorize]
+        public async Task<ActionResult> UpdateAppointmentFrontendCompatible_DISABLED(Guid id, [FromBody] UpdateAppointmentRequest request)
         {
             try
             {
@@ -2067,6 +2528,11 @@ namespace HopewellClinicApi.Controllers
                     return Unauthorized(new { error = "Invalid user token", userIdClaim = userIdClaim });
                 }
 
+                // Authorization: Check if user has permission to update this appointment
+                var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+                var isAdmin = userRoles.Contains("admin");
+                var isDoctor = userRoles.Contains("doctor");
+
                 // Step 2: Validate request
                 if (request == null)
                 {
@@ -2074,15 +2540,42 @@ namespace HopewellClinicApi.Controllers
                     return BadRequest(new { error = "Request body is null" });
                 }
 
-                Console.WriteLine($"Request received: AppointmentDate={request.AppointmentDate}, StartTime={request.StartTime}, EndTime={request.EndTime}, Notes={request.Notes}, Status={request.Status}");
+                Console.WriteLine($"Request received: AppointmentDate={request.AppointmentDate}, StartTime={request.StartTime}, EndTime={request.EndTime}, Notes={request.Notes}, Status={request.Status}, ServiceId={request.ServiceId}, StaffId={request.StaffId}");
 
                 // Step 3: Check if appointment exists
                 Console.WriteLine($"Looking for appointment with ID: {id}");
-                var existingAppointment = await _context.Appointments.FindAsync(id);
+                var existingAppointment = await _context.Appointments
+                    .Include(a => a.Patient)
+                    .Include(a => a.Staff)
+                    .FirstOrDefaultAsync(a => a.Id == id);
+                
                 if (existingAppointment == null)
                 {
                     Console.WriteLine($"Appointment not found: {id}");
                     return NotFound(new { error = "Appointment not found", appointmentId = id });
+                }
+
+                // Authorization checks
+                if (!isAdmin)
+                {
+                    if (isDoctor)
+                    {
+                        // Doctor can only update appointments assigned to them
+                        var staff = await _context.Staff.FirstOrDefaultAsync(s => s.UserId == userId);
+                        if (staff == null || existingAppointment.StaffId != staff.Id)
+                        {
+                            return StatusCode(403, new { error = "You can only update appointments assigned to you" });
+                        }
+                    }
+                    else
+                    {
+                        // Patient can only update their own appointments
+                        var patient = await _context.Patients.FirstOrDefaultAsync(p => p.UserId == userId);
+                        if (patient == null || existingAppointment.PatientId != patient.Id)
+                        {
+                            return StatusCode(403, new { error = "You can only update your own appointments" });
+                        }
+                    }
                 }
 
                 Console.WriteLine($"Found appointment: {existingAppointment.Id}, Status: {existingAppointment.Status}");
@@ -2098,7 +2591,9 @@ namespace HopewellClinicApi.Controllers
                     StartTime = existingAppointment.StartTime,
                     EndTime = existingAppointment.EndTime,
                     Notes = existingAppointment.Notes,
-                    Status = existingAppointment.Status
+                    Status = existingAppointment.Status,
+                    StaffId = existingAppointment.StaffId,
+                    ServiceId = existingAppointment.ServiceId
                 };
 
                 // Update fields only if they are provided in the request
@@ -2132,26 +2627,88 @@ namespace HopewellClinicApi.Controllers
                     Console.WriteLine($"Updated Status from '{originalValues.Status}' to '{existingAppointment.Status}'");
                 }
 
+                // Update ServiceId if provided
+                if (request.ServiceId.HasValue)
+                {
+                    var service = await _context.Services.FindAsync(request.ServiceId.Value);
+                    if (service == null)
+                    {
+                        return BadRequest(new { error = "Service not found" });
+                    }
+                    existingAppointment.ServiceId = request.ServiceId.Value;
+                    Console.WriteLine($"Updated ServiceId from '{originalValues.ServiceId}' to '{existingAppointment.ServiceId}'");
+                }
+
+                // Update StaffId if provided
+                if (request.StaffId.HasValue)
+                {
+                    var staff = await _context.Staff.FindAsync(request.StaffId.Value);
+                    if (staff == null)
+                    {
+                        return BadRequest(new { error = "Staff member not found" });
+                    }
+                    
+                    // Validate staff availability at the specified time if date/time changed
+                    if (request.AppointmentDate.HasValue || request.StartTime.HasValue || request.EndTime.HasValue)
+                    {
+                        var appointmentDate = request.AppointmentDate ?? existingAppointment.AppointmentDate;
+                        var startTime = request.StartTime ?? existingAppointment.StartTime;
+                        var endTime = request.EndTime ?? existingAppointment.EndTime;
+
+                        // Check for time conflicts with the assigned staff member
+                        var conflictingAppointment = await _context.Appointments
+                            .Where(a => a.Id != id &&
+                                       a.AppointmentDate == appointmentDate &&
+                                       a.StaffId == request.StaffId.Value &&
+                                       a.Status != "cancelled" &&
+                                       ((a.StartTime <= startTime && a.EndTime > startTime) ||
+                                        (a.StartTime < endTime && a.EndTime >= endTime) ||
+                                        (a.StartTime >= startTime && a.EndTime <= endTime)))
+                            .FirstOrDefaultAsync();
+
+                        if (conflictingAppointment != null)
+                        {
+                            return BadRequest(new { error = "Staff member is not available at this time" });
+                        }
+                    }
+                    
+                    existingAppointment.StaffId = request.StaffId.Value;
+                    Console.WriteLine($"Updated StaffId from '{originalValues.StaffId}' to '{existingAppointment.StaffId}'");
+                }
+
                 existingAppointment.UpdatedAt = DateTime.UtcNow;
 
-                // Step 6: Save changes
-                await _context.SaveChangesAsync();
-                Console.WriteLine("Changes saved successfully");
+                // Step 6: Save changes - CRITICAL: Ensure all changes are persisted
+                try
+                {
+                    var changesSaved = await _context.SaveChangesAsync();
+                    Console.WriteLine($"Changes saved successfully. Rows affected: {changesSaved}");
+                    
+                    // Reload appointment to verify changes were saved
+                    await _context.Entry(existingAppointment).ReloadAsync();
+                    Console.WriteLine($"Verified appointment after save - Status: {existingAppointment.Status}, Date: {existingAppointment.AppointmentDate}");
+                }
+                catch (Exception dbEx)
+                {
+                    Console.WriteLine($"Database save error: {dbEx.Message}");
+                    Console.WriteLine($"Inner exception: {dbEx.InnerException?.Message}");
+                    return StatusCode(500, new { 
+                        error = "Failed to save appointment changes",
+                        message = dbEx.Message,
+                        details = dbEx.InnerException?.Message
+                    });
+                }
 
                 return Ok(new { 
-                    success = true, 
-                    message = "Appointment updated successfully", 
-                    id = id,
-                    appointmentCount = appointmentCount,
-                    originalValues = originalValues,
-                    updatedValues = new
-                    {
-                        AppointmentDate = existingAppointment.AppointmentDate,
-                        StartTime = existingAppointment.StartTime,
-                        EndTime = existingAppointment.EndTime,
-                        Notes = existingAppointment.Notes,
-                        Status = existingAppointment.Status
-                    }
+                    id = existingAppointment.Id,
+                    appointmentDate = existingAppointment.AppointmentDate.ToString("yyyy-MM-dd"),
+                    startTime = existingAppointment.StartTime.ToString("HH:mm:ss"),
+                    endTime = existingAppointment.EndTime.ToString("HH:mm:ss"),
+                    status = existingAppointment.Status,
+                    staffId = existingAppointment.StaffId,
+                    serviceId = existingAppointment.ServiceId,
+                    notes = existingAppointment.Notes,
+                    message = "Appointment updated successfully"
                 });
             }
             catch (Exception ex)
@@ -2257,25 +2814,28 @@ namespace HopewellClinicApi.Controllers
         /// Approve an appointment
         /// </summary>
         [HttpPut("{id}/approve")]
-        [AllowAnonymous] // Temporarily allow anonymous for testing
+        [Authorize(Roles = "admin,doctor")]
         public async Task<ActionResult<AppointmentActionResponse>> ApproveAppointment(Guid id, [FromBody] ApproveAppointmentRequest request)
         {
             try
             {
-                Console.WriteLine($"PUT /api/Appointments/{id}/approve - Starting approval");
-                
-                // Get user information (handle anonymous access)
+                // Get user information
                 var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 
-                // For anonymous testing, use a default admin user ID
                 if (string.IsNullOrEmpty(userIdClaim))
                 {
-                    userIdClaim = "550e8400-e29b-41d4-a716-446655441001"; // Default admin user ID
-                    Console.WriteLine($"Using default admin user for anonymous testing: {userIdClaim}");
+                    return Unauthorized(new { error = "User ID not found in token" });
+                }
+
+                // Determine user role
+                var userRole = "admin";
+                if (User.IsInRole("doctor"))
+                {
+                    userRole = "doctor";
                 }
 
                 // Approve appointment
-                var result = await _appointmentStatusService.ApproveAppointmentAsync(id, request ?? new ApproveAppointmentRequest(), userIdClaim);
+                var result = await _appointmentStatusService.ApproveAppointmentAsync(id, request ?? new ApproveAppointmentRequest(), userIdClaim, userRole);
                 
                 Console.WriteLine($"Appointment approved successfully: {result.Id}");
                 return Ok(result);
@@ -2312,34 +2872,34 @@ namespace HopewellClinicApi.Controllers
         /// Reject an appointment
         /// </summary>
         [HttpPut("{id}/reject")]
-        [AllowAnonymous] // Temporarily allow anonymous for testing
+        [Authorize(Roles = "admin,doctor")]
         public async Task<ActionResult<AppointmentActionResponse>> RejectAppointment(Guid id, [FromBody] RejectAppointmentRequest request)
         {
             try
             {
-                Console.WriteLine($"PUT /api/Appointments/{id}/reject - Starting rejection");
-                
-                // Get user information (handle anonymous access)
+                // Get user information
                 var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 
-                // For anonymous testing, use a default admin user ID
                 if (string.IsNullOrEmpty(userIdClaim))
                 {
-                    userIdClaim = "550e8400-e29b-41d4-a716-446655441001"; // Default admin user ID
-                    Console.WriteLine($"Using default admin user for anonymous testing: {userIdClaim}");
+                    return Unauthorized(new { error = "User ID not found in token" });
                 }
 
                 // Validate request
                 if (request == null || string.IsNullOrEmpty(request.Reason))
                 {
-                    Console.WriteLine("Rejection reason is required");
                     return BadRequest(new { error = "Rejection reason is required" });
                 }
 
-                Console.WriteLine($"Rejection reason: {request.Reason}");
+                // Determine user role
+                var userRole = "admin";
+                if (User.IsInRole("doctor"))
+                {
+                    userRole = "doctor";
+                }
 
                 // Reject appointment
-                var result = await _appointmentStatusService.RejectAppointmentAsync(id, request, userIdClaim);
+                var result = await _appointmentStatusService.RejectAppointmentAsync(id, request, userIdClaim, userRole);
                 
                 Console.WriteLine($"Appointment rejected successfully: {result.Id}");
                 return Ok(result);

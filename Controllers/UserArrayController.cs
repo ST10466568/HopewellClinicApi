@@ -48,8 +48,6 @@ namespace HopewellClinicApi.Controllers
                         displayRole = "admin";
                     else if (userRoles.Contains("doctor"))
                         displayRole = "doctor";
-                    else if (userRoles.Contains("nurse"))
-                        displayRole = "nurse";
                     else if (userRoles.Contains("staff"))
                         displayRole = "staff";
                     else if (userRoles.Contains("patient"))
@@ -95,6 +93,8 @@ namespace HopewellClinicApi.Controllers
         }
     }
 }
+
+
 
 
 

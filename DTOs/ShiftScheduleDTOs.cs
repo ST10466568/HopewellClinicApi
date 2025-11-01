@@ -106,6 +106,23 @@ namespace HopewellClinicApi.DTOs
         public List<DoctorShiftInfo> Shifts { get; set; } = new();
     }
 
+    // Shift schedule item for frontend compatibility (matches frontend ShiftSchedule interface)
+    public class ShiftScheduleItem
+    {
+        public Guid? Id { get; set; }
+        
+        [Required]
+        public string DayOfWeek { get; set; } = string.Empty; // "Monday", "Tuesday", etc.
+        
+        [Required]
+        public string StartTime { get; set; } = string.Empty; // "HH:mm" format
+        
+        [Required]
+        public string EndTime { get; set; } = string.Empty; // "HH:mm" format
+        
+        public bool IsActive { get; set; } = true;
+    }
+
     // Booking validation result
     public class BookingValidationResult
     {
